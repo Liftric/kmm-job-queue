@@ -1,7 +1,7 @@
 package com.liftric.persisted.queue
 
 data class Operation(
-    val rules: List<JobRule>,
+    val rules: Set<JobRule>,
     val job: Job,
     var tag: String? = null
 )

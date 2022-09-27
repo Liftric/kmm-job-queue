@@ -11,14 +11,14 @@ class JobManagerTests {
         val id = UUID::class.instance().toString()
 
         jobManager.schedule<TestJob>(
-            rules = listOf(UniqueRule(id)),
+            rules = setOf(UniqueRule(id)),
             params = mapOf(
                 "testResultId" to id
             )
         )
 
         jobManager.schedule<TestJob>(
-            rules = listOf(UniqueRule(id)),
+            rules = setOf(UniqueRule(id)),
             params = mapOf(
                 "testResultId" to id
             )

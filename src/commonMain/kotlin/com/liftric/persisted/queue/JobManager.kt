@@ -5,7 +5,7 @@ import kotlinx.coroutines.*
 class JobManager(val factory: JobFactory) {
     val queue = Queue()
 
-    suspend inline fun <reified T: Job> schedule(rules: List<JobRule>, params: Map<String, Any>) {
+    suspend inline fun <reified T: Job> schedule(rules: Set<JobRule>, params: Map<String, Any>) {
         try {
             val job = factory.create(T::class, params)
 
