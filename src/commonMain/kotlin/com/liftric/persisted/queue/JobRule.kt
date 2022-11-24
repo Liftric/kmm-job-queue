@@ -1,9 +1,10 @@
 package com.liftric.persisted.queue
 
 abstract class JobRule {
-    open suspend fun mapping(operation: Operation): Operation { return operation }
+    var mapper: (() -> JobInfo)? = null
+    open suspend fun mapping(info: JobInfo): JobInfo = info
     @Throws(Exception::class)
-    open suspend fun willSchedule(queue: Queue, operation: Operation) {}
-    open suspend fun willRun(queue: Queue, operation: Operation) {}
-    open suspend fun willRemove(operation: Operation) {}
+    open suspend fun willSchedule(queue: Queue, operation: Task) {}
+    open suspend fun willRun(operation: Task) {}
+    open suspend fun willRemove(task: Task, event: JobDelegate.Event) {}
 }

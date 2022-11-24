@@ -3,17 +3,17 @@ package com.liftric.persisted.queue
 interface Context<T: Job> {
     val name: String
     suspend fun done()
-    suspend fun fail(exception: Exception)
-    suspend fun cancel()
+    suspend fun fail(error: Error)
+    suspend fun cancel(error: Error)
 }
 
-class Delegate<T: Job>(job: T): Context<T> {
+class JobDelegate<T: Job>(job: T): Context<T> {
     override val name: String = job::class.simpleName!!
 
     sealed class Event {
         object DidEnd: Event()
-        object DidCancel: Event()
-        data class DidFail(val throwable: Throwable): Event()
+        data class DidCancel(val error: Error): Event()
+        data class DidFail(val error: Error): Event()
     }
 
     var onEvent: ((Event) -> Unit)? = null
@@ -22,11 +22,11 @@ class Delegate<T: Job>(job: T): Context<T> {
         onEvent?.invoke(Event.DidEnd)
     }
 
-    override suspend fun fail(exception: Exception) {
-        onEvent?.invoke(Event.DidFail(exception))
+    override suspend fun fail(error: Error) {
+        onEvent?.invoke(Event.DidFail(error))
     }
 
-    override suspend fun cancel() {
-        onEvent?.invoke(Event.DidCancel)
+    override suspend fun cancel(error: Error) {
+        onEvent?.invoke(Event.DidCancel(error))
     }
 }

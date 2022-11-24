@@ -7,6 +7,14 @@ class TestJob(override val params: Map<String, Any>): Job() {
         println(testResultId)
         context.done()
     } catch (e: Exception) {
-        context.cancel()
+        context.cancel(e)
+    }
+}
+
+class TestErrorJob(override val params: Map<String, Any>): Job() {
+    override suspend fun body(context: Context<Job>) = try {
+        context.fail(Exception("Oh shoot!"))
+    } catch (e: Exception) {
+        context.cancel(e)
     }
 }

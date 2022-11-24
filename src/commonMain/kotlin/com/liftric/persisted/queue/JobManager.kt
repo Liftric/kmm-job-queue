@@ -1,58 +1,51 @@
 package com.liftric.persisted.queue
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.withContext
 
 class JobManager(val factory: JobFactory) {
     val queue = Queue()
+    private val delegate = TaskDelegate()
 
-    suspend inline fun <reified T: Job> schedule(rules: Set<JobRule>, params: Map<String, Any>) {
+    init {
+        delegate.onEvent = { event ->
+            when (event) {
+                TaskDelegate.Event.Terminate -> {
+                    next()
+                }
+            }
+        }
+    }
+
+    suspend inline fun <reified T: Job> schedule(init: JobInfo.() -> JobInfo) {
         try {
-            val job = factory.create(T::class, params)
-
-            val operation = rules.fold(Operation(rules, job)) { operation, rule ->
-                rule.mapping(operation)
+            val info = init(JobInfo()).apply {
+                rules.forEach { it.mapping(this) }
             }
 
-            rules.forEach {
-                it.willSchedule(queue, operation)
-            }
+            val job = factory.create(T::class, info.params)
+            job.tag = info.tag
+            job.rules.addAll(info.rules)
 
-            queue.operations.add(operation)
+            val task = Task(job)
+
+            job.rules.forEach { it.willSchedule(queue, task) }
+
+            queue.tasks.add(task)
+
+            println("Added task id=${task.job.id}, tag=${task.job.tag}")
         } catch (e: Exception) {
             println(e.message)
         }
     }
 
-    suspend inline fun next() {
-        val operation = queue.operations.removeFirst()
+    suspend fun start() = next()
 
-        val event: Deferred<Delegate.Event> = withContext(Dispatchers.Default) {
-            val result = CompletableDeferred<Delegate.Event>()
-
-            val delegate = Delegate(operation.job)
-            delegate.onEvent = { event ->
-                result.complete(event)
-            }
-
-            operation.rules.forEach { it.willRun(queue, operation) }
-
-            operation.job.body(delegate)
-
-            result
+    suspend fun next() {
+        if (queue.tasks.isEmpty()) return
+        withContext(queue.dispatcher) {
+            val task = queue.tasks.removeFirst()
+            task.delegate = delegate
+            task.run()
         }
-
-        when(event.await()) {
-            is Delegate.Event.DidEnd -> {
-                println("Delegate.Event.DidEnd")
-            }
-            is Delegate.Event.DidCancel -> {
-                println("Delegate.Event.DidCancel")
-            }
-            is Delegate.Event.DidFail -> {
-                println("Delegate.Event.DidFail")
-            }
-        }
-
-        operation.rules.forEach { it.willRemove(operation) }
     }
 }
