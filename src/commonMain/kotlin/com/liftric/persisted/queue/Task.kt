@@ -30,11 +30,11 @@ class Task(val job: Job) {
                 terminate()
             }
             is JobDelegate.Event.DidCancel -> {
-                println("Delegate.Event.DidCancel: ${event.throwable.message}")
+                println("Delegate.Event.DidCancel: ${event.error.message}")
                 terminate()
             }
             is JobDelegate.Event.DidFail -> {
-                println("Delegate.Event.DidFail: ${event.throwable.message}")
+                println("Delegate.Event.DidFail: ${event.error.message}")
             }
         }
 
