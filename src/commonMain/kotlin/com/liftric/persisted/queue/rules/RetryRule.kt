@@ -17,13 +17,13 @@ data class RetryRule(val limit: RetryLimit, val delay: Duration = 0.seconds): Jo
             when (limit) {
                 is RetryLimit.Unlimited ->  {
                     delay(delay)
-                    task.delegate?.broadcast(Event.DidRetry(task))
+                    delegate?.broadcast(Event.DidRetry(task))
                     task.run()
                 }
                 is RetryLimit.Limited -> {
                     if (count > 0) {
                         delay(delay)
-                        task.delegate?.broadcast(Event.DidRetry(task))
+                        delegate?.broadcast(Event.DidRetry(task))
                         count -= 1
                         task.run()
                     } else {

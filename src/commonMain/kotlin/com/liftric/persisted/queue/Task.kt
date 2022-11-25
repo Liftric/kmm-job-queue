@@ -1,9 +1,7 @@
 package com.liftric.persisted.queue
 
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
 
 class Task(
     private val job: Job,
@@ -24,7 +22,10 @@ class Task(
                 result.complete(event)
             }
 
-            rules.forEach { it.willRun(this@Task) }
+            rules.forEach {
+                it.delegate = this@Task.delegate
+                it.willRun(this@Task)
+            }
 
             job.body(delegate)
 

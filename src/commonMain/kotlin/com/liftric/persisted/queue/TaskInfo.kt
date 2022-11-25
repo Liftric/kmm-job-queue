@@ -1,8 +1,5 @@
 package com.liftric.persisted.queue
 
-import kotlinx.serialization.Serializable
-
-@Serializable
 class TaskInfo {
     var tag: String? = null
     var rules: Set<JobRule> = setOf()
@@ -23,7 +20,6 @@ class TaskInfo {
     }
 }
 
-@Serializable
 class RuleInfo {
     val rules: MutableSet<JobRule> = mutableSetOf()
 }

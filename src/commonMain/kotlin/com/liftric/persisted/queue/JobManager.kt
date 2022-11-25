@@ -6,7 +6,7 @@ import kotlinx.coroutines.withContext
 
 class JobManager(val factory: JobFactory) {
     val queue = Queue()
-    private val delegate = TaskDelegate()
+    val delegate = TaskDelegate()
 
     @PublishedApi internal val _onEvent: MutableStateFlow<Event> = MutableStateFlow(Event.None)
     val onEvent: StateFlow<Event> = _onEvent.asStateFlow()
@@ -19,7 +19,6 @@ class JobManager(val factory: JobFactory) {
                 }
                 else -> Unit
             }
-            println(event)
             _onEvent.emit(event)
         }
     }
@@ -34,7 +33,10 @@ class JobManager(val factory: JobFactory) {
 
             val task = Task(job, info)
 
-            task.rules.forEach { it.willSchedule(queue, task) }
+            task.rules.forEach {
+                it.delegate = delegate
+                it.willSchedule(queue, task)
+            }
 
             _onEvent.emit(Event.DidSchedule(task))
 

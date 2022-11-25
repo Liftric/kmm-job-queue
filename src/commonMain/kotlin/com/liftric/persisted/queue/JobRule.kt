@@ -1,9 +1,7 @@
 package com.liftric.persisted.queue
 
-import kotlinx.serialization.Serializable
-
-@Serializable
 abstract class JobRule {
+    var delegate: TaskDelegate? = null
     open suspend fun mutating(info: TaskInfo): TaskInfo = info
     @Throws(Throwable::class)
     open suspend fun willSchedule(queue: Queue, task: Task) {}
