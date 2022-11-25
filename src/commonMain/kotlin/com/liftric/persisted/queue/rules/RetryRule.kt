@@ -8,7 +8,7 @@ import kotlin.time.Duration.Companion.seconds
 data class RetryRule(val limit: RetryLimit, val delay: Duration = 0.seconds): JobRule() {
     private var count = 0
 
-    override suspend fun willSchedule(queue: Queue, operation: Task) {
+    override suspend fun willSchedule(queue: Queue, task: Task) {
         if (limit is RetryLimit.Limited) count = limit.count
     }
 
@@ -17,13 +17,13 @@ data class RetryRule(val limit: RetryLimit, val delay: Duration = 0.seconds): Jo
             when (limit) {
                 is RetryLimit.Unlimited ->  {
                     delay(delay)
-                    println("Retry task id=${task.job.id}")
+                    println("Retry task id=${task.id}")
                     task.run()
                 }
                 is RetryLimit.Limited -> {
                     if (count > 0) {
                         delay(delay)
-                        println("Retry task id=${task.job.id}, tries=$count")
+                        println("Retry task id=${task.id}, tries=$count")
                         count -= 1
                         task.run()
                     } else {
@@ -40,7 +40,7 @@ sealed class RetryLimit {
     object Unlimited: RetryLimit()
 }
 
-fun RuleInfos.retry(limit: RetryLimit, delay: Duration = 0.seconds): RuleInfos {
+fun RuleInfo.retry(limit: RetryLimit, delay: Duration = 0.seconds): RuleInfo {
     val rule = RetryRule(limit, delay)
     rules.add(rule)
     return this

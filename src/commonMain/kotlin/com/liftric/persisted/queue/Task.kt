@@ -5,7 +5,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 
-class Task(val job: Job) {
+class Task(
+    private val job: Job,
+    info: TaskInfo
+) {
+    val id: UUID = UUID::class.instance()
+    val tag: String? = info.tag
+    val rules: Set<JobRule> = info.rules
+
     var delegate: TaskDelegate? = null
 
     suspend fun run() {
@@ -17,7 +24,7 @@ class Task(val job: Job) {
                 result.complete(event)
             }
 
-            job.rules.forEach { it.willRun(this@Task) }
+            rules.forEach { it.willRun(this@Task) }
 
             job.body(delegate)
 
@@ -38,7 +45,7 @@ class Task(val job: Job) {
             }
         }
 
-        job.rules.forEach { it.willRemove(this@Task, event) }
+        rules.forEach { it.willRemove(this@Task, event) }
     }
 
     suspend fun terminate() {
@@ -46,7 +53,7 @@ class Task(val job: Job) {
     }
 }
 
-class TaskDelegate{
+class TaskDelegate {
     sealed class Event {
         object Terminate: Event()
     }

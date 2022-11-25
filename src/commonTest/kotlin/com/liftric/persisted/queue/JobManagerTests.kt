@@ -11,7 +11,8 @@ import kotlin.time.Duration.Companion.seconds
 class JobManagerTests {
     @Test
     fun testSchedule() = runBlocking {
-        val jobManager = JobManager(TestFactory())
+        val jobFactory = TestFactory()
+        val jobManager = JobManager(jobFactory)
         val id = UUID::class.instance().toString()
 
         jobManager.schedule<TestJob> {
@@ -37,7 +38,8 @@ class JobManagerTests {
 
     @Test
     fun testRetry() = runBlocking {
-        val jobManager = JobManager(TestFactory())
+        val jobFactory = TestFactory()
+        val jobManager = JobManager(jobFactory)
 
         jobManager.schedule<TestErrorJob> {
             rules {

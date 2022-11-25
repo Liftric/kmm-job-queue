@@ -1,5 +1,6 @@
 package com.liftric.persisted.queue
 
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class JobManager(val factory: JobFactory) {
@@ -16,23 +17,21 @@ class JobManager(val factory: JobFactory) {
         }
     }
 
-    suspend inline fun <reified T: Job> schedule(init: JobInfo.() -> JobInfo) {
+    suspend inline fun <reified T: Job> schedule(init: TaskInfo.() -> TaskInfo) {
         try {
-            val info = init(JobInfo()).apply {
-                rules.forEach { it.mapping(this) }
+            val info = init(TaskInfo()).apply {
+                rules.forEach { it.mutating(this) }
             }
 
             val job = factory.create(T::class, info.params)
-            job.tag = info.tag
-            job.rules.addAll(info.rules)
 
-            val task = Task(job)
+            val task = Task(job, info)
 
-            job.rules.forEach { it.willSchedule(queue, task) }
+            task.rules.forEach { it.willSchedule(queue, task) }
 
             queue.tasks.add(task)
 
-            println("Added task id=${task.job.id}, tag=${task.job.tag}")
+            println("Added task id=${task.id}, tag=${task.tag}")
         } catch (e: Exception) {
             println(e.message)
         }
@@ -40,12 +39,14 @@ class JobManager(val factory: JobFactory) {
 
     suspend fun start() = next()
 
-    suspend fun next() {
+    private suspend fun next() {
         if (queue.tasks.isEmpty()) return
         withContext(queue.dispatcher) {
-            val task = queue.tasks.removeFirst()
-            task.delegate = delegate
-            task.run()
+            launch {
+                val task = queue.tasks.removeFirst()
+                task.delegate = delegate
+                task.run()
+            }
         }
     }
 }
