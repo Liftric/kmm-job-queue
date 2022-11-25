@@ -16,8 +16,8 @@ class Task(
     var delegate: TaskDelegate? = null
 
     suspend fun run() {
-        val event: JobDelegate.Event = coroutineScope {
-            val result = CompletableDeferred<JobDelegate.Event>()
+        val event: Event = coroutineScope {
+            val result = CompletableDeferred<Event>()
 
             val delegate = JobDelegate(job)
             delegate.onEvent = { event ->
@@ -32,35 +32,29 @@ class Task(
         }.await()
 
         when(event) {
-            is JobDelegate.Event.DidEnd -> {
-                println("Delegate.Event.DidEnd")
+            is Event.DidEnd -> {
                 terminate()
             }
-            is JobDelegate.Event.DidCancel -> {
-                println("Delegate.Event.DidCancel: ${event.error.message}")
+            is Event.DidCancel -> {
                 terminate()
             }
-            is JobDelegate.Event.DidFail -> {
-                println("Delegate.Event.DidFail: ${event.error.message}")
-            }
+            else -> Unit
         }
+
+        delegate?.broadcast(event)
 
         rules.forEach { it.willRemove(this@Task, event) }
     }
 
     suspend fun terminate() {
-        delegate?.terminate()
+        delegate?.broadcast(Event.DidTerminate(this))
     }
 }
 
 class TaskDelegate {
-    sealed class Event {
-        object Terminate: Event()
-    }
-
     var onEvent: (suspend (Event) -> Unit)? = null
 
-    suspend fun terminate() {
-        onEvent?.invoke(Event.Terminate)
+    suspend fun broadcast(event: Event) {
+        onEvent?.invoke(event)
     }
 }

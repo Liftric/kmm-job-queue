@@ -12,18 +12,18 @@ data class RetryRule(val limit: RetryLimit, val delay: Duration = 0.seconds): Jo
         if (limit is RetryLimit.Limited) count = limit.count
     }
 
-    override suspend fun willRemove(task: Task, event: JobDelegate.Event) {
-        if (event is JobDelegate.Event.DidFail) {
+    override suspend fun willRemove(task: Task, event: Event) {
+        if (event is Event.DidFail) {
             when (limit) {
                 is RetryLimit.Unlimited ->  {
                     delay(delay)
-                    println("Retry task id=${task.id}")
+                    task.delegate?.broadcast(Event.DidRetry(task))
                     task.run()
                 }
                 is RetryLimit.Limited -> {
                     if (count > 0) {
                         delay(delay)
-                        println("Retry task id=${task.id}, tries=$count")
+                        task.delegate?.broadcast(Event.DidRetry(task))
                         count -= 1
                         task.run()
                     } else {

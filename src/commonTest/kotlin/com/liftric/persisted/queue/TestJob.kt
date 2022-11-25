@@ -4,7 +4,7 @@ class TestJob(override val params: Map<String, Any>): Job() {
     private val testResultId: String by params
 
     override suspend fun body(context: Context<Job>) = try {
-        println(testResultId)
+        println("testResultId=$testResultId")
         context.done()
     } catch (e: Error) {
         context.cancel(e)

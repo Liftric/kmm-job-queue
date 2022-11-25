@@ -7,11 +7,11 @@ class UniqueRule(private val tag: String? = null): JobRule() {
         info.tag = tag
         return info
     }
-    @Throws(Exception::class)
+
     override suspend fun willSchedule(queue: Queue, task: Task) {
         for (item in queue.tasks) {
             if (item.tag == tag || item.id == task.id) {
-                throw Exception("Should be unique")
+                throw Error("Should be unique")
             }
         }
     }

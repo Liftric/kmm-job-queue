@@ -7,26 +7,20 @@ interface Context<T: Job> {
     suspend fun cancel(error: Error)
 }
 
-class JobDelegate<T: Job>(job: T): Context<T> {
+class JobDelegate<T: Job>(private val job: T): Context<T> {
     override val name: String = job::class.simpleName!!
-
-    sealed class Event {
-        object DidEnd: Event()
-        data class DidCancel(val error: Error): Event()
-        data class DidFail(val error: Error): Event()
-    }
 
     var onEvent: ((Event) -> Unit)? = null
 
     override suspend fun done() {
-        onEvent?.invoke(Event.DidEnd)
+        onEvent?.invoke(Event.DidEnd(job))
     }
 
     override suspend fun fail(error: Error) {
-        onEvent?.invoke(Event.DidFail(error))
+        onEvent?.invoke(Event.DidFail(job, error))
     }
 
     override suspend fun cancel(error: Error) {
-        onEvent?.invoke(Event.DidCancel(error))
+        onEvent?.invoke(Event.DidCancel(job, error))
     }
 }

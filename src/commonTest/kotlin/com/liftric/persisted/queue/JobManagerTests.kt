@@ -3,7 +3,8 @@ package com.liftric.persisted.queue
 import com.liftric.persisted.queue.rules.RetryLimit
 import com.liftric.persisted.queue.rules.retry
 import com.liftric.persisted.queue.rules.unique
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.seconds
@@ -47,6 +48,15 @@ class JobManagerTests {
             }
         }
 
+        var count = 0
+        val job = async {
+            ensureActive()
+            jobManager.onEvent.filter { it is Event.DidRetry }.collect {
+                count += 1
+            }
+        }
         jobManager.start()
+        job.cancel()
+        assertEquals(3, count)
     }
 }
