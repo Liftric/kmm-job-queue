@@ -56,6 +56,7 @@ class JobManagerTests {
             }
         }
         jobManager.start()
+        delay(1L)
         job.cancel()
         assertEquals(3, count)
     }
