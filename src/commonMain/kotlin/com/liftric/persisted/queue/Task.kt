@@ -19,6 +19,7 @@ data class Task(
     suspend fun run() {
         coroutineScope {
             ensureActive()
+
             rules.forEach { it.willRun(this@Task) }
 
             val event = try {

@@ -15,7 +15,7 @@ data class RetryRule(val limit: RetryLimit, val delay: Duration = 0.seconds): Jo
                 is RetryLimit.Limited -> {
                     if (limit.count > 0) {
                         val rules = task.rules.minus(this).plus(RetryRule(RetryLimit.Limited((limit.count + 1) - 2), delay))
-                        task.broadcast(Event.WillRetry(task))
+                        task.broadcast(Event.Rule(this, "Attempting to retry task=$task"))
                         task.repeat(Task(UUID::class.instance(), task.job, task.tag, rules, Clock.System.now().plus(delay)))
                     } else {
                         task.terminate()

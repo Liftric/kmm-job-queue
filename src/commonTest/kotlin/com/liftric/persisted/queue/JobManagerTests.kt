@@ -1,11 +1,10 @@
 package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.RetryLimit
+import com.liftric.persisted.queue.rules.delay
 import com.liftric.persisted.queue.rules.retry
 import com.liftric.persisted.queue.rules.unique
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.seconds
@@ -16,9 +15,15 @@ class JobManagerTests {
         val jobFactory = TestFactory()
         val jobManager = JobManager(jobFactory)
         val id = UUID::class.instance().toString()
+        val job = async {
+            jobManager.onEvent.collect {
+                println(it)
+            }
+        }
 
         jobManager.schedule<TestJob> {
             rules {
+                delay(1.seconds)
                 unique(id)
             }
             params("testResultId" to id)
@@ -36,6 +41,8 @@ class JobManagerTests {
         jobManager.start()
 
         assertEquals(0, jobManager.queue.tasks.value.count())
+
+        job.cancel()
     }
 
     @Test

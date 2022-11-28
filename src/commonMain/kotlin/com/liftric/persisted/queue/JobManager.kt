@@ -75,7 +75,7 @@ class JobManager(val factory: JobFactory) {
                 it.willSchedule(queue, newTask)
             }
 
-            onEvent.emit(Event.DidSchedule(newTask))
+            onEvent.emit(Event.DidRepeat(newTask))
 
             queue.tasks.value.add(newTask)
 
