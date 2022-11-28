@@ -1,25 +1,28 @@
 package com.liftric.persisted.queue
 
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
+import kotlinx.datetime.Clock
+
 
 class JobManager(val factory: JobFactory) {
     val queue = Queue()
     val delegate = TaskDelegate()
 
-    @PublishedApi internal val _onEvent: MutableStateFlow<Event> = MutableStateFlow(Event.None)
-    val onEvent: StateFlow<Event> = _onEvent.asStateFlow()
+    val onEvent = MutableSharedFlow<Event>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.SUSPEND
+    )
 
     init {
+        delegate.onExit = { }
+        delegate.onRepeat = { task ->
+            repeat(task)
+        }
         delegate.onEvent = { event ->
-            when (event) {
-                is Event.DidTerminate -> {
-                    next()
-                }
-                else -> Unit
-            }
-            _onEvent.emit(event)
+            onEvent.emit(event)
         }
     }
 
@@ -34,25 +37,58 @@ class JobManager(val factory: JobFactory) {
             val task = Task(job, info)
 
             task.rules.forEach {
-                it.delegate = delegate
                 it.willSchedule(queue, task)
             }
 
-            _onEvent.emit(Event.DidSchedule(task))
+            onEvent.emit(Event.DidSchedule(task))
 
-            queue.tasks.add(task)
+            queue.tasks.value.add(task)
+
+            queue.tasks.value.sortBy { it.startTime }
         } catch (error: Error) {
-            _onEvent.emit(Event.DidCancelSchedule(error))
+            onEvent.emit(Event.Error(error))
         }
     }
 
-    suspend fun start() = next()
+    suspend fun start() {
+        queue.dispatcher {
+             launch {
+                 while (true) {
+                     delay(1000L)
+                     if (queue.isRunning.isLocked) break
+                     if (queue.tasks.value.isEmpty()) break
+                     if ((queue.tasks.value.first().startTime) <= Clock.System.now()) {
+                         queue.isRunning.withLock {
+                             run()
+                         }
+                     }
+                 }
+             }
+        }
+    }
 
-    private suspend fun next() {
-        if (queue.tasks.isEmpty()) return
-        withContext(queue.dispatcher) {
+    private suspend fun repeat(task: Task) {
+        try {
+            val newTask = task
+
+            newTask.rules.forEach {
+                it.willSchedule(queue, newTask)
+            }
+
+            onEvent.emit(Event.DidSchedule(newTask))
+
+            queue.tasks.value.add(newTask)
+
+            queue.tasks.value.sortBy { it.startTime }
+        } catch (error: Error) {
+            onEvent.emit(Event.Error(error))
+        }
+    }
+
+    private suspend fun run() {
+        queue.dispatcher {
             launch {
-                val task = queue.tasks.removeFirst()
+                val task = queue.tasks.value.removeFirst()
                 task.delegate = delegate
                 task.run()
             }

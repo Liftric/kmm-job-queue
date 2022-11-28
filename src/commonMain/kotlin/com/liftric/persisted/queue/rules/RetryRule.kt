@@ -1,31 +1,22 @@
 package com.liftric.persisted.queue.rules
 
 import com.liftric.persisted.queue.*
-import kotlinx.coroutines.*
+import kotlinx.datetime.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 data class RetryRule(val limit: RetryLimit, val delay: Duration = 0.seconds): JobRule() {
-    private var count = 0
-
-    override suspend fun willSchedule(queue: Queue, task: Task) {
-        if (limit is RetryLimit.Limited) count = limit.count
-    }
-
     override suspend fun willRemove(task: Task, event: Event) {
         if (event is Event.DidFail) {
             when (limit) {
                 is RetryLimit.Unlimited ->  {
-                    delay(delay)
-                    delegate?.broadcast(Event.DidRetry(task))
-                    task.run()
+                    task.repeat(task.copy(startTime = Clock.System.now()))
                 }
                 is RetryLimit.Limited -> {
-                    if (count > 0) {
-                        delay(delay)
-                        delegate?.broadcast(Event.DidRetry(task))
-                        count -= 1
-                        task.run()
+                    if (limit.count > 0) {
+                        val rules = task.rules.minus(this).plus(RetryRule(RetryLimit.Limited((limit.count + 1) - 2), delay))
+                        task.broadcast(Event.WillRetry(task))
+                        task.repeat(Task(UUID::class.instance(), task.job, task.tag, rules, Clock.System.now().plus(delay)))
                     } else {
                         task.terminate()
                     }

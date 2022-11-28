@@ -34,6 +34,7 @@ kotlin {
             dependencies {
                 implementation(libs.kotlinx.coroutines)
                 implementation(libs.kotlinx.serialization)
+                implementation(libs.kotlinx.datetime)
                 implementation(libs.multiplatform.settings)
             }
         }

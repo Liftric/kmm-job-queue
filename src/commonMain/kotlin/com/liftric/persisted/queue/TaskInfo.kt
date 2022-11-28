@@ -1,7 +1,8 @@
 package com.liftric.persisted.queue
 
-class TaskInfo {
+data class TaskInfo(
     var tag: String? = null
+) {
     var rules: Set<JobRule> = setOf()
         private set
     var params: Map<String, String> = mapOf()

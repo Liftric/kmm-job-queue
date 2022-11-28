@@ -1,61 +1,67 @@
 package com.liftric.persisted.queue
 
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
-class Task(
-    private val job: Job,
-    info: TaskInfo
+data class Task(
+    val id: UUID,
+    val job: Job,
+    val tag: String?,
+    val rules: Set<JobRule>,
+    val startTime: Instant = Clock.System.now()
 ) {
-    val id: UUID = UUID::class.instance()
-    val tag: String? = info.tag
-    val rules: Set<JobRule> = info.rules
-
     var delegate: TaskDelegate? = null
 
+    constructor(job: Job, info: TaskInfo) : this (UUID::class.instance(), job, info.tag, info.rules)
+
     suspend fun run() {
-        val event: Event = coroutineScope {
-            val result = CompletableDeferred<Event>()
+        coroutineScope {
+            ensureActive()
+            rules.forEach { it.willRun(this@Task) }
 
-            val delegate = JobDelegate(job)
-            delegate.onEvent = { event ->
-                result.complete(event)
-            }
-
-            rules.forEach {
-                it.delegate = this@Task.delegate
-                it.willRun(this@Task)
-            }
-
-            job.body(delegate)
-
-            result
-        }.await()
-
-        when(event) {
-            is Event.DidEnd -> {
+            val event = try {
+                job.body()
+                Event.DidEnd(job)
+            } catch (e: Error) {
                 terminate()
+                Event.DidFail(job, e)
             }
-            is Event.DidCancel -> {
-                terminate()
-            }
-            else -> Unit
+
+            delegate?.broadcast(event)
+
+            rules.forEach { it.willRemove(this@Task, event) }
         }
-
-        delegate?.broadcast(event)
-
-        rules.forEach { it.willRemove(this@Task, event) }
     }
 
     suspend fun terminate() {
-        delegate?.broadcast(Event.DidTerminate(this))
+        delegate?.exit()
+    }
+
+    suspend fun repeat(task: Task) {
+        delegate?.repeat(task)
+    }
+
+    suspend fun broadcast(event: Event) {
+        delegate?.broadcast(event)
     }
 }
 
 class TaskDelegate {
+    var onExit: (suspend () -> Unit)? = null
+    var onRepeat: (suspend (Task) -> Unit)? = null
     var onEvent: (suspend (Event) -> Unit)? = null
 
     suspend fun broadcast(event: Event) {
         onEvent?.invoke(event)
+    }
+
+    suspend fun exit() {
+        onExit?.invoke()
+    }
+
+    suspend fun repeat(task: Task) {
+        onRepeat?.invoke(task)
     }
 }
