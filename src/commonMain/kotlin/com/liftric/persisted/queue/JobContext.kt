@@ -27,7 +27,7 @@ data class Operation(
     override val startTime: Instant = Clock.System.now()
 ): JobContext {
     @Transient
-    var delegate: TaskDelegate? = null
+    var delegate: JobDelegate? = null
 
     constructor(job: Job, info: JobInfo) : this (UUID::class.instance(), job, info.tag, info.rules)
 
@@ -68,7 +68,7 @@ data class Operation(
     }
 }
 
-class TaskDelegate {
+class JobDelegate {
     var onExit: (suspend () -> Unit)? = null
     var onRepeat: (suspend (Operation) -> Unit)? = null
     var onEvent: (suspend (Event) -> Unit)? = null

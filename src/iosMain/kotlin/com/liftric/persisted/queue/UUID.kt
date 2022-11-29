@@ -20,6 +20,6 @@ actual object UUIDSerializer: KSerializer<UUID> {
     }
 
     override fun serialize(encoder: Encoder, value: UUID) {
-        encoder.encodeString(value.toString())
+        encoder.encodeString(value.toString().lowercase())
     }
 }

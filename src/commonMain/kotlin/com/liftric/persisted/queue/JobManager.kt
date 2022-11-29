@@ -6,25 +6,45 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 
-class JobManager(val factory: JobFactory, configuration: Queue.Configuration? = null) {
+class JobManager(
+    val factory: JobFactory,
+    configuration: Queue.Configuration? = null
+) {
     val queue = OperationsQueue(configuration)
-    private val delegate = TaskDelegate()
-
     val onEvent = MutableSharedFlow<Event>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.SUSPEND
     )
 
-    init {
-        delegate.onExit = {
+    private val delegate = JobDelegate()
+    private var listener: kotlinx.coroutines.Job? = null
 
+    init {
+        delegate.onExit = { /* Do something */ }
+        delegate.onRepeat = { repeat(it) }
+        delegate.onEvent = { onEvent.emit(it) }
+    }
+
+    suspend fun start() {
+        listener = queue.dispatcher {
+            launch {
+                while (true) {
+                    delay(1000L)
+                    if (queue.isRunning.isLocked) break
+                    if (queue.operations.value.isEmpty()) break
+                    if ((queue.operations.value.first().startTime) <= Clock.System.now()) {
+                        queue.isRunning.withLock {
+                            run()
+                        }
+                    }
+                }
+            }
         }
-        delegate.onRepeat = { operation ->
-            repeat(operation)
-        }
-        delegate.onEvent = { event ->
-            onEvent.emit(event)
-        }
+    }
+
+    fun stop() {
+        listener?.cancel()
+        listener = null
     }
 
     suspend inline fun <reified T: Job> schedule(init: JobInfo.() -> JobInfo) {
@@ -46,23 +66,6 @@ class JobManager(val factory: JobFactory, configuration: Queue.Configuration? = 
             queue.add(operation)
         } catch (error: Error) {
             onEvent.emit(Event.DidThrowSchedule(error))
-        }
-    }
-
-    suspend fun start() {
-        queue.dispatcher {
-             launch {
-                 while (true) {
-                     delay(1000L)
-                     if (queue.isRunning.isLocked) break
-                     if (queue.operations.value.isEmpty()) break
-                     if ((queue.operations.value.first().startTime) <= Clock.System.now()) {
-                         queue.isRunning.withLock {
-                             run()
-                         }
-                     }
-                 }
-             }
         }
     }
 
