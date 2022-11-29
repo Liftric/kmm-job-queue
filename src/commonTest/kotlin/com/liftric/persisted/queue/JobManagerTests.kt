@@ -36,11 +36,11 @@ class JobManagerTests {
             params("testResultId" to id)
         }
 
-        assertEquals(1, jobManager.queue.operations.value.count())
+        assertEquals(1, jobManager.queue.operations.count())
 
         jobManager.start()
 
-        assertEquals(0, jobManager.queue.operations.value.count())
+        assertEquals(0, jobManager.queue.operations.count())
 
         job.cancel()
     }

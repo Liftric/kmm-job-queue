@@ -10,7 +10,7 @@ data class UniqueRule(private val tag: String? = null): JobRule() {
     }
 
     override suspend fun willSchedule(queue: Queue, context: JobContext) {
-        for (item in queue.operations.value) {
+        for (item in queue.operations) {
             if (item.tag == tag || item.id == context.id) {
                 throw Error("Should be unique")
             }

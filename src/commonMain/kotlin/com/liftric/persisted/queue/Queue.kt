@@ -1,43 +1,70 @@
 package com.liftric.persisted.queue
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.datetime.Clock
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 interface Queue {
-    val dispatcher: CoroutineDispatcher
-    val maxConcurrency: Int
-    val operations: StateFlow<List<Operation>>
+    val scope: CoroutineScope
+    val operations: List<Operation>
 
     data class Configuration(
-        val dispatcher: CoroutineDispatcher,
-        val maxConcurrency: Int
+        val scope: CoroutineScope
     )
 }
 
 class OperationsQueue(
-    override val dispatcher: CoroutineDispatcher,
-    override val maxConcurrency: Int
+    override val scope: CoroutineScope
 ): Queue {
-    private val _operations: MutableStateFlow<MutableList<Operation>> = MutableStateFlow(mutableListOf())
-    override val operations: StateFlow<List<Operation>> = _operations.asStateFlow()
-
-    var isRunning: Mutex = Mutex(false)
+    private val queue = MutableSharedFlow<Job>(extraBufferCapacity = Int.MAX_VALUE)
+    private val _operations: MutableList<Operation> = mutableListOf()
+    override val operations: List<Operation>
+        get() = _operations
 
     constructor(configuration: Queue.Configuration?) : this(
-        configuration?.dispatcher ?: Dispatchers.Default,
-        configuration?.maxConcurrency ?: 1
+        configuration?.scope ?: CoroutineScope(Dispatchers.Default)
     )
 
-    fun add(operation: Operation) {
-        _operations.value.add(operation)
-        _operations.value.sortBy { it.startTime }
+    init {
+        queue.onEach { it.join() }
+            .flowOn(Dispatchers.Default)
+            .launchIn(scope)
     }
 
-    fun removeFirst(): Operation {
-        return _operations.value.removeFirst()
+    fun add(operation: Operation) {
+        _operations.add(operation)
+        _operations.sortBy { it.startTime }
+    }
+
+    suspend fun start() {
+        while (true) {
+            delay(1000L)
+            if (_operations.isEmpty()) break
+            if ((_operations.first().startTime) <= Clock.System.now()) {
+                submit {
+                    withContext(Dispatchers.Default) {
+                        _operations.removeFirst().run()
+                    }
+                }
+            }
+        }
+    }
+
+    fun cancel() {
+        scope.cancel()
+    }
+
+    private fun submit(
+        context: CoroutineContext = EmptyCoroutineContext,
+        block: suspend CoroutineScope.() -> Unit
+    ) {
+        val job = scope.launch(context, CoroutineStart.LAZY, block)
+        queue.tryEmit(job)
     }
 }
-

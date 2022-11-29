@@ -32,26 +32,24 @@ data class Operation(
     constructor(job: Job, info: JobInfo) : this (UUID::class.instance(), job, info.tag, info.rules)
 
     suspend fun run() {
-        coroutineScope {
-            val event = try {
-                rules.forEach { it.willRun(this@Operation) }
+        val event = try {
+            rules.forEach { it.willRun(this@Operation) }
 
-                job.body()
+            job.body()
 
-                Event.DidEnd(this@Operation)
-            } catch (e: Error) {
-                terminate()
-                Event.DidFail(this@Operation, e)
-            }
+            Event.DidEnd(this@Operation)
+        } catch (e: Error) {
+            terminate()
+            Event.DidFail(this@Operation, e)
+        }
 
-            try {
-                delegate?.broadcast(event)
+        try {
+            delegate?.broadcast(event)
 
-                rules.forEach { it.willRemove(this@Operation, event) }
-            } catch (e: Error) {
-                terminate()
-                Event.DidFail(this@Operation, e)
-            }
+            rules.forEach { it.willRemove(this@Operation, event) }
+        } catch (e: Error) {
+            terminate()
+            Event.DidFail(this@Operation, e)
         }
     }
 

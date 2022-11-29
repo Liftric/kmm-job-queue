@@ -1,10 +1,7 @@
 package com.liftric.persisted.queue
 
-import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.sync.withLock
-import kotlinx.datetime.Clock
 
 class JobManager(
     val factory: JobFactory,
@@ -16,8 +13,8 @@ class JobManager(
         onBufferOverflow = BufferOverflow.SUSPEND
     )
 
-    private val delegate = JobDelegate()
-    private var listener: kotlinx.coroutines.Job? = null
+    @PublishedApi
+    internal val delegate = JobDelegate()
 
     init {
         delegate.onExit = { /* Do something */ }
@@ -26,25 +23,11 @@ class JobManager(
     }
 
     suspend fun start() {
-        listener = queue.dispatcher {
-            launch {
-                while (true) {
-                    delay(1000L)
-                    if (queue.isRunning.isLocked) break
-                    if (queue.operations.value.isEmpty()) break
-                    if ((queue.operations.value.first().startTime) <= Clock.System.now()) {
-                        queue.isRunning.withLock {
-                            run()
-                        }
-                    }
-                }
-            }
-        }
+        queue.start()
     }
 
     fun stop() {
-        listener?.cancel()
-        listener = null
+        queue.cancel()
     }
 
     suspend inline fun <reified T: Job> schedule(init: JobInfo.() -> JobInfo) {
@@ -56,6 +39,7 @@ class JobManager(
             val job = factory.create(T::class, info.params)
 
             val operation = Operation(job, info)
+            operation.delegate = delegate
 
             operation.rules.forEach {
                 it.willSchedule(queue, operation)
@@ -71,6 +55,8 @@ class JobManager(
 
     private suspend fun repeat(operation: Operation) {
         try {
+            operation.delegate = delegate
+
             operation.rules.forEach {
                 it.willSchedule(queue, operation)
             }
@@ -80,16 +66,6 @@ class JobManager(
             queue.add(operation)
         } catch (error: Error) {
             onEvent.emit(Event.DidThrowRepeat(error))
-        }
-    }
-
-    private suspend fun run() {
-        queue.dispatcher {
-            launch {
-                val task = queue.removeFirst()
-                task.delegate = delegate
-                task.run()
-            }
         }
     }
 }
