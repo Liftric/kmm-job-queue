@@ -1,26 +1,26 @@
 package com.liftric.persisted.queue
 
-data class TaskInfo(
+data class JobInfo(
     var tag: String? = null
 ) {
-    var rules: Set<JobRule> = setOf()
+    var rules: List<JobRule> = listOf()
         private set
     var params: Map<String, String> = mapOf()
         private set
 
-    fun rules(init: RuleInfo.() -> Unit): TaskInfo {
+    fun rules(init: RuleInfo.() -> Unit): JobInfo {
         val info = RuleInfo()
         info.init()
-        rules = info.rules
+        rules = info.rules.distinctBy { it::class }
         return this
     }
 
-    fun params(vararg params: Pair<String, String>): TaskInfo {
+    fun params(vararg params: Pair<String, String>): JobInfo {
         this.params = params.toMap()
         return this
     }
 }
 
 class RuleInfo {
-    val rules: MutableSet<JobRule> = mutableSetOf()
+    val rules: MutableList<JobRule> = mutableListOf()
 }

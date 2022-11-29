@@ -1,15 +1,17 @@
 package com.liftric.persisted.queue.rules
 
 import com.liftric.persisted.queue.*
+import kotlinx.serialization.Serializable
 
-class UniqueRule(private val tag: String? = null): JobRule() {
-    override suspend fun mutating(info: TaskInfo) {
+@Serializable
+data class UniqueRule(private val tag: String? = null): JobRule() {
+    override suspend fun mutating(info: JobInfo) {
         info.tag = tag
     }
 
-    override suspend fun willSchedule(queue: Queue, task: Task) {
-        for (item in queue.tasks.value) {
-            if (item.tag == tag || item.id == task.id) {
+    override suspend fun willSchedule(queue: Queue, context: JobContext) {
+        for (item in queue.operations.value) {
+            if (item.tag == tag || item.id == context.id) {
                 throw Error("Should be unique")
             }
         }

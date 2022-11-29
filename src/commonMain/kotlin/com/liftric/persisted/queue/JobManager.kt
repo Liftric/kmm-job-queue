@@ -6,10 +6,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 
-
-class JobManager(val factory: JobFactory) {
-    val queue = Queue()
-    val delegate = TaskDelegate()
+class JobManager(val factory: JobFactory, configuration: Queue.Configuration? = null) {
+    val queue = OperationsQueue(configuration)
+    private val delegate = TaskDelegate()
 
     val onEvent = MutableSharedFlow<Event>(
         extraBufferCapacity = 1,
@@ -17,36 +16,36 @@ class JobManager(val factory: JobFactory) {
     )
 
     init {
-        delegate.onExit = { }
-        delegate.onRepeat = { task ->
-            repeat(task)
+        delegate.onExit = {
+
+        }
+        delegate.onRepeat = { operation ->
+            repeat(operation)
         }
         delegate.onEvent = { event ->
             onEvent.emit(event)
         }
     }
 
-    suspend inline fun <reified T: Job> schedule(init: TaskInfo.() -> TaskInfo) {
+    suspend inline fun <reified T: Job> schedule(init: JobInfo.() -> JobInfo) {
         try {
-            val info = init(TaskInfo()).apply {
+            val info = init(JobInfo()).apply {
                 rules.forEach { it.mutating(this) }
             }
 
             val job = factory.create(T::class, info.params)
 
-            val task = Task(job, info)
+            val operation = Operation(job, info)
 
-            task.rules.forEach {
-                it.willSchedule(queue, task)
+            operation.rules.forEach {
+                it.willSchedule(queue, operation)
             }
 
-            onEvent.emit(Event.DidSchedule(task))
+            onEvent.emit(Event.DidSchedule(operation))
 
-            queue.tasks.value.add(task)
-
-            queue.tasks.value.sortBy { it.startTime }
+            queue.add(operation)
         } catch (error: Error) {
-            onEvent.emit(Event.Error(error))
+            onEvent.emit(Event.DidThrowSchedule(error))
         }
     }
 
@@ -56,8 +55,8 @@ class JobManager(val factory: JobFactory) {
                  while (true) {
                      delay(1000L)
                      if (queue.isRunning.isLocked) break
-                     if (queue.tasks.value.isEmpty()) break
-                     if ((queue.tasks.value.first().startTime) <= Clock.System.now()) {
+                     if (queue.operations.value.isEmpty()) break
+                     if ((queue.operations.value.first().startTime) <= Clock.System.now()) {
                          queue.isRunning.withLock {
                              run()
                          }
@@ -67,28 +66,24 @@ class JobManager(val factory: JobFactory) {
         }
     }
 
-    private suspend fun repeat(task: Task) {
+    private suspend fun repeat(operation: Operation) {
         try {
-            val newTask = task
-
-            newTask.rules.forEach {
-                it.willSchedule(queue, newTask)
+            operation.rules.forEach {
+                it.willSchedule(queue, operation)
             }
 
-            onEvent.emit(Event.DidRepeat(newTask))
+            onEvent.emit(Event.DidScheduleRepeat(operation))
 
-            queue.tasks.value.add(newTask)
-
-            queue.tasks.value.sortBy { it.startTime }
+            queue.add(operation)
         } catch (error: Error) {
-            onEvent.emit(Event.Error(error))
+            onEvent.emit(Event.DidThrowRepeat(error))
         }
     }
 
     private suspend fun run() {
         queue.dispatcher {
             launch {
-                val task = queue.tasks.value.removeFirst()
+                val task = queue.removeFirst()
                 task.delegate = delegate
                 task.run()
             }
