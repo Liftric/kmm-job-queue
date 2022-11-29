@@ -1,6 +1,5 @@
 package com.liftric.persisted.queue
 
-import kotlinx.coroutines.coroutineScope
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
@@ -49,7 +48,7 @@ data class Operation(
             rules.forEach { it.willRemove(this@Operation, event) }
         } catch (e: Error) {
             terminate()
-            Event.DidFail(this@Operation, e)
+            Event.DidFailOnRemove(this@Operation, e)
         }
     }
 

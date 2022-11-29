@@ -8,6 +8,7 @@ sealed class Event {
     data class DidThrow(val job: JobContext, val error: Error): Event()
     data class DidEnd(val job: JobContext): Event()
     data class DidFail(val job: JobContext, val error: Error): Event()
+    data class DidFailOnRemove(val job: JobContext, val error: Error): Event()
     data class Rule(val tag: String, val message: String): Event() {
         constructor(tag: JobRule, message: String) : this(tag::class.simpleName!!, message)
     }

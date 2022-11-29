@@ -7,14 +7,13 @@ class JobManager(
     val factory: JobFactory,
     configuration: Queue.Configuration? = null
 ) {
-    val queue = OperationsQueue(configuration)
-    val onEvent = MutableSharedFlow<Event>(
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.SUSPEND
-    )
+    @PublishedApi
+    internal val queue = OperationsQueue(configuration)
 
     @PublishedApi
     internal val delegate = JobDelegate()
+
+    val onEvent = MutableSharedFlow<Event>(extraBufferCapacity = Int.MAX_VALUE)
 
     init {
         delegate.onExit = { /* Do something */ }
