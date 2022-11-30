@@ -1,7 +1,10 @@
 package com.liftric.persisted.queue
 
+import kotlin.time.Duration
+
 data class JobInfo(
-    var tag: String? = null
+    var tag: String? = null,
+    var timeout: Duration = Duration.INFINITE
 ) {
     var rules: List<JobRule> = listOf()
         private set

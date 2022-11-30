@@ -1,12 +1,11 @@
 package com.liftric.persisted.queue
 
-import com.liftric.persisted.queue.rules.RetryLimit
-import com.liftric.persisted.queue.rules.delay
-import com.liftric.persisted.queue.rules.retry
-import com.liftric.persisted.queue.rules.unique
+import com.liftric.persisted.queue.rules.*
 import kotlinx.coroutines.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.time.Duration.Companion.seconds
 
 class JobSchedulerTests {
@@ -70,5 +69,30 @@ class JobSchedulerTests {
         delay(1000L)
         job.cancel()
         assertEquals(4, count)
+    }
+
+    @Test
+    fun testCancel() {
+        runBlocking {
+            val factory = TestFactory()
+            val scheduler = JobScheduler(factory)
+
+            assertFailsWith<CancellationException> {
+                launch {
+                    scheduler.onEvent.collect {
+                        cancel()
+                        scheduler.queue.cancel()
+                    }
+                }
+
+                scheduler.schedule<TestTask> {
+                    rules {
+                        timeout(10.seconds)
+                    }
+                }
+
+                scheduler.queue.start()
+            }
+        }
     }
 }
