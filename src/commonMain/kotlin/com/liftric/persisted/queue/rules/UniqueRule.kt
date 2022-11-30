@@ -10,9 +10,9 @@ data class UniqueRule(private val tag: String? = null): JobRule() {
     }
 
     override suspend fun willSchedule(queue: Queue, context: JobContext) {
-        for (item in queue.operations) {
+        for (item in queue.jobs) {
             if (item.tag == tag || item.id == context.id) {
-                throw Error("Should be unique")
+                throw Error("Job with id=${item.id} already exists")
             }
         }
     }

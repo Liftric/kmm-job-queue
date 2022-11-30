@@ -1,6 +1,6 @@
 package com.liftric.persisted.queue
 
-class TestJob(override val params: Map<String, Any>): Job {
+class TestTask(override val params: Map<String, Any>): Task {
     private val testResultId: String by params
 
     override suspend fun body() {
@@ -8,7 +8,7 @@ class TestJob(override val params: Map<String, Any>): Job {
     }
 }
 
-class TestErrorJob(override val params: Map<String, Any>): Job {
+class TestErrorTask(override val params: Map<String, Any>): Task {
     override suspend fun body() {
         throw Error("Oh shoot!")
     }

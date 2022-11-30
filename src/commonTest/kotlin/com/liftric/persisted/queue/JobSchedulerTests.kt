@@ -9,19 +9,19 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.seconds
 
-class JobManagerTests {
+class JobSchedulerTests {
     @Test
     fun testSchedule() = runBlocking {
-        val jobFactory = TestFactory()
-        val jobManager = JobManager(jobFactory)
+        val factory = TestFactory()
+        val scheduler = JobScheduler(factory)
         val id = UUID::class.instance().toString()
         val job = async {
-            jobManager.onEvent.collect {
+            scheduler.onEvent.collect {
                 println(it)
             }
         }
 
-        jobManager.schedule<TestJob> {
+        scheduler.schedule<TestTask> {
             rules {
                 delay(1.seconds)
                 unique(id)
@@ -29,30 +29,30 @@ class JobManagerTests {
             params("testResultId" to id)
         }
 
-        jobManager.schedule<TestJob> {
+        scheduler.schedule<TestTask> {
             rules {
                 unique(id)
             }
             params("testResultId" to id)
         }
 
-        assertEquals(1, jobManager.queue.operations.count())
+        assertEquals(1, scheduler.queue.jobs.count())
 
-        jobManager.start()
+        scheduler.start()
 
-        assertEquals(0, jobManager.queue.operations.count())
+        assertEquals(0, scheduler.queue.jobs.count())
 
         job.cancel()
     }
 
     @Test
     fun testRetry() = runBlocking {
-        val jobFactory = TestFactory()
-        val jobManager = JobManager(jobFactory)
+        val factory = TestFactory()
+        val scheduler = JobScheduler(factory)
 
         var count = 0
         val job = async {
-            jobManager.onEvent.collect {
+            scheduler.onEvent.collect {
                 println(it)
                 if (it is Event.DidFail) {
                     count += 1
@@ -60,13 +60,13 @@ class JobManagerTests {
             }
         }
 
-        jobManager.schedule<TestErrorJob> {
+        scheduler.schedule<TestErrorTask> {
             rules {
                 retry(RetryLimit.Limited(3), delay = 10.seconds)
             }
         }
 
-        jobManager.start()
+        scheduler.start()
         delay(1000L)
         job.cancel()
         assertEquals(4, count)

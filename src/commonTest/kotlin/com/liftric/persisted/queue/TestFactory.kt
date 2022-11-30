@@ -2,10 +2,10 @@ package com.liftric.persisted.queue
 
 import kotlin.reflect.KClass
 
-class TestFactory: JobFactory {
-    override fun <T : Job> create(type: KClass<T>, params: Map<String, Any>): Job = when(type) {
-        TestJob::class -> TestJob(params)
-        TestErrorJob::class -> TestErrorJob(params)
+class TestFactory: TaskFactory {
+    override fun <T : Task> create(type: KClass<T>, params: Map<String, Any>): Task = when(type) {
+        TestTask::class -> TestTask(params)
+        TestErrorTask::class -> TestErrorTask(params)
         else -> throw Exception("Unknown job!")
     }
 }

@@ -12,20 +12,20 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 interface Queue {
     val scope: CoroutineScope
-    val operations: List<Operation>
+    val jobs: List<com.liftric.persisted.queue.Job>
 
     data class Configuration(
         val scope: CoroutineScope
     )
 }
 
-class OperationsQueue(
+class JobQueue(
     override val scope: CoroutineScope
 ): Queue {
     private val queue = MutableSharedFlow<Job>(extraBufferCapacity = Int.MAX_VALUE)
-    private val _operations: MutableList<Operation> = mutableListOf()
-    override val operations: List<Operation>
-        get() = _operations
+    private val _jobs: MutableList<com.liftric.persisted.queue.Job> = mutableListOf()
+    override val jobs: List<com.liftric.persisted.queue.Job>
+        get() = _jobs
 
     constructor(configuration: Queue.Configuration?) : this(
         configuration?.scope ?: CoroutineScope(Dispatchers.Default)
@@ -37,19 +37,19 @@ class OperationsQueue(
             .launchIn(scope)
     }
 
-    fun add(operation: Operation) {
-        _operations.add(operation)
-        _operations.sortBy { it.startTime }
+    fun add(job: com.liftric.persisted.queue.Job) {
+        _jobs.add(job)
+        _jobs.sortBy { it.startTime }
     }
 
     suspend fun start() {
         while (true) {
             delay(1000L)
-            if (_operations.isEmpty()) break
-            if ((_operations.first().startTime) <= Clock.System.now()) {
+            if (_jobs.isEmpty()) break
+            if ((_jobs.first().startTime) <= Clock.System.now()) {
                 submit {
                     withContext(Dispatchers.Default) {
-                        _operations.removeFirst().run()
+                        _jobs.removeFirst().run()
                     }
                 }
             }
