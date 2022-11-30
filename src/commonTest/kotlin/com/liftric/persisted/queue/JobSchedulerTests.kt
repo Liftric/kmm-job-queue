@@ -36,6 +36,8 @@ class JobSchedulerTests {
 
         scheduler.queue.start()
 
+        delay(2000L)
+
         assertEquals(0, scheduler.queue.jobs.count())
 
         job.cancel()
@@ -69,12 +71,12 @@ class JobSchedulerTests {
     }
 
     @Test
-    fun testCancel() {
+    fun testCancelDuringRun() {
         val factory = TestFactory()
         val scheduler = JobScheduler(factory)
 
         runBlocking {
-            scheduler.schedule<TestTask> {
+            scheduler.schedule<LongRunningTask> {
                 rules {
                     delay(10.seconds)
                 }
@@ -85,13 +87,89 @@ class JobSchedulerTests {
                     println(it)
                     if (it is JobEvent.DidEnd || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.WillRun) {
-                        scheduler.queue.cancel()
+                        scheduler.queue.cancel(it.job.id)
+                    }
+                    if (it is JobEvent.DidCancel) {
+                        assertTrue(scheduler.queue.jobs.isEmpty())
                         cancel()
                     }
                 }
             }
 
             scheduler.queue.start()
+        }
+    }
+
+    @Test
+    fun testCancelByIdBeforeEnqueue() {
+        val factory = TestFactory()
+        val scheduler = JobScheduler(factory)
+
+        runBlocking {
+            val completable = CompletableDeferred<UUID>()
+
+            launch {
+                scheduler.onEvent.collect {
+                    if (it is JobEvent.DidEnd || it is JobEvent.DidFail) fail("Continued after run")
+                    if (it is JobEvent.DidSchedule) {
+                        completable.complete(it.job.id)
+                        cancel()
+                    }
+                    if (it is JobEvent.DidCancel) {
+                        assertTrue(scheduler.queue.jobs.isEmpty())
+                        cancel()
+                    }
+                }
+            }
+
+            delay(1000L)
+
+            scheduler.schedule<TestTask> {
+                rules {
+                    delay(2.seconds)
+                }
+            }
+
+            scheduler.queue.cancel(completable.await())
+
+            assertTrue(scheduler.queue.jobs.isEmpty())
+        }
+    }
+
+    @Test
+    fun testCancelByIdAfterEnqueue() {
+        val factory = TestFactory()
+        val scheduler = JobScheduler(factory)
+
+        runBlocking {
+            launch {
+                scheduler.schedule<LongRunningTask> {
+                    rules {
+                        delay(0.seconds)
+                    }
+                }
+            }
+
+            launch {
+                scheduler.onEvent.collect {
+                    println(it)
+                    if (it is JobEvent.DidSchedule) {
+                        delay(3000L)
+                        scheduler.queue.cancel(it.job.id)
+                    }
+                    if (it is JobEvent.DidCancel) {
+                        cancel()
+                    }
+                }
+            }
+
+            scheduler.queue.start()
+
+            scheduler.schedule<LongRunningTask> {
+                rules {
+                    delay(30.seconds)
+                }
+            }
         }
     }
 }

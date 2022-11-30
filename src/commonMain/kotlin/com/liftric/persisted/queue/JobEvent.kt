@@ -8,6 +8,7 @@ sealed class JobEvent {
     data class DidThrowOnSchedule(val error: Error): JobEvent()
     data class DidEnd(val job: JobContext): JobEvent()
     data class DidFail(val job: JobContext, val error: Error): JobEvent()
+    data class DidCancel(val job: JobContext, val message: String): JobEvent()
     data class DidFailOnRemove(val job: JobContext, val error: Error): JobEvent()
 }
 

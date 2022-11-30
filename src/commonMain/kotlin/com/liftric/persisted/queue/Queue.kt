@@ -1,11 +1,9 @@
 package com.liftric.persisted.queue
 
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.*
 import kotlinx.datetime.Clock
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -23,9 +21,13 @@ class JobQueue(
     override val scope: CoroutineScope
 ): Queue {
     private val queue = MutableSharedFlow<Job>(extraBufferCapacity = Int.MAX_VALUE)
-    private val _jobs: MutableList<com.liftric.persisted.queue.Job> = mutableListOf()
+
+    private val enquedJobs = atomic(mutableListOf<com.liftric.persisted.queue.Job>())
+    private val _jobs = atomic(mutableListOf<com.liftric.persisted.queue.Job>())
     override val jobs: List<com.liftric.persisted.queue.Job>
-        get() = _jobs
+        get() = enquedJobs.value.plus(_jobs.value)
+
+    val onEvent: MutableSharedFlow<JobEvent> = MutableSharedFlow()
 
     constructor(configuration: Queue.Configuration?) : this(
         configuration?.scope ?: CoroutineScope(Dispatchers.Default)
@@ -39,21 +41,22 @@ class JobQueue(
 
     @PublishedApi
     internal fun add(job: com.liftric.persisted.queue.Job) {
-        _jobs.add(job)
-        _jobs.sortBy { it.startTime }
+        _jobs.value = _jobs.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
     }
 
     suspend fun start() {
         withContext(Dispatchers.Default) {
             while (isActive) {
                 delay(1000L)
-                if (_jobs.isEmpty()) break
-                if (_jobs.first().startTime <= Clock.System.now()) {
+                if (_jobs.value.isEmpty()) break
+                if (_jobs.value.first().startTime <= Clock.System.now()) {
                     submit {
-                        val job = _jobs.removeFirst()
+                        val job = _jobs.value.removeFirst()
+                        enquedJobs.value.add(job)
                         withTimeout(job.timeout) {
                             job.run()
                         }
+                        enquedJobs.value.remove(job)
                     }
                 }
             }
@@ -62,6 +65,18 @@ class JobQueue(
 
     fun cancel() {
         scope.cancel()
+    }
+
+    suspend fun cancel(id: UUID) {
+        _jobs.value.firstOrNull { it.id == id }?.apply {
+            _jobs.value.remove(this)
+            onEvent.emit(JobEvent.DidCancel(this, "Cancelled before run"))
+        } ?: run {
+            enquedJobs.value.firstOrNull { it.id == id }?.apply {
+                enquedJobs.value.remove(this)
+                onEvent.emit(JobEvent.DidCancel(this, "Cancelled before run"))
+            }?.cancel()
+        }
     }
 
     private fun submit(

@@ -1,5 +1,9 @@
 package com.liftric.persisted.queue
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
@@ -21,31 +25,50 @@ data class Job(
 
     constructor(task: Task, info: JobInfo) : this (UUID::class.instance(), info.timeout, task, info.tag, info.rules)
 
+    private var job: kotlinx.coroutines.Job? = null
+
+    var isCancelled: Boolean = false
+        private set
+
     internal suspend fun run() {
-        val event = try {
-            rules.forEach { it.willRun(this@Job) }
+        coroutineScope {
+            if (isCancelled) {
+                delegate?.broadcast(JobEvent.DidCancel(this@Job, "Cancelled during run"))
+            } else {
+                job = launch {
+                    val event = try {
+                        rules.forEach { it.willRun(this@Job) }
 
-            delegate?.broadcast(JobEvent.WillRun(this@Job))
+                        delegate?.broadcast(JobEvent.WillRun(this@Job))
 
-            task.body()
+                        task.body()
 
-            JobEvent.DidEnd(this@Job)
-        } catch (e: Error) {
-            terminate()
-            JobEvent.DidFail(this@Job, e)
-        }
+                        JobEvent.DidEnd(this@Job)
+                    } catch (e: Error) {
+                        JobEvent.DidFail(this@Job, e)
+                    } catch (e: CancellationException) {
+                        JobEvent.DidCancel(this@Job, e.message!!)
+                    }
 
-        try {
-            delegate?.broadcast(event)
+                    try {
+                        delegate?.broadcast(event)
 
-            rules.forEach { it.willRemove(this@Job, event) }
-        } catch (e: Error) {
-            terminate()
-            JobEvent.DidFailOnRemove(this@Job, e)
+                        if (isCancelled) return@launch
+
+                        rules.forEach { it.willRemove(this@Job, event) }
+                    } catch (e: Error) {
+                        JobEvent.DidFailOnRemove(this@Job, e)
+                    } catch (e: CancellationException) {
+                        JobEvent.DidCancel(this@Job, e.message!!)
+                    }
+                }
+            }
         }
     }
 
-    override suspend fun terminate() {
+    override suspend fun cancel() {
+        isCancelled = true
+        job?.cancel(CancellationException("Cancelled during run"))
         delegate?.exit()
     }
 
