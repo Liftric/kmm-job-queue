@@ -38,7 +38,7 @@ class JobSchedulerTests {
 
         assertEquals(1, scheduler.queue.jobs.count())
 
-        scheduler.start()
+        scheduler.queue.start()
 
         assertEquals(0, scheduler.queue.jobs.count())
 
@@ -66,7 +66,7 @@ class JobSchedulerTests {
             }
         }
 
-        scheduler.start()
+        scheduler.queue.start()
         delay(1000L)
         job.cancel()
         assertEquals(4, count)

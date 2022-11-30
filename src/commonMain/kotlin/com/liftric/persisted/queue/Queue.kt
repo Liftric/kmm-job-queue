@@ -37,7 +37,8 @@ class JobQueue(
             .launchIn(scope)
     }
 
-    fun add(job: com.liftric.persisted.queue.Job) {
+    @PublishedApi
+    internal fun add(job: com.liftric.persisted.queue.Job) {
         _jobs.add(job)
         _jobs.sortBy { it.startTime }
     }

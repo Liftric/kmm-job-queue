@@ -19,14 +19,6 @@ class JobScheduler(
         delegate.onEvent = { onEvent.emit(it) }
     }
 
-    suspend fun start() {
-        queue.start()
-    }
-
-    fun stop() {
-        queue.cancel()
-    }
-
     suspend inline fun <reified T: Task> schedule(init: JobInfo.() -> JobInfo) {
         try {
             val info = init(JobInfo()).apply {
