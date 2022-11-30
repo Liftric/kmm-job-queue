@@ -8,5 +8,5 @@ abstract class JobRule {
     @Throws(Throwable::class)
     open suspend fun willSchedule(queue: Queue, context: JobContext) {}
     open suspend fun willRun(context: JobContext) {}
-    open suspend fun willRemove(context: JobContext, result: Event) {}
+    open suspend fun willRemove(context: JobContext, result: JobEvent) {}
 }

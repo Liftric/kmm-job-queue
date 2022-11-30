@@ -8,8 +8,8 @@ import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 data class PeriodicRule(val interval: Duration = 0.seconds): JobRule() {
-    override suspend fun willRemove(context: JobContext, result: Event) {
-        if (result is Event.DidEnd) {
+    override suspend fun willRemove(context: JobContext, result: JobEvent) {
+        if (result is JobEvent.DidEnd) {
             context.repeat(startTime = Clock.System.now().plus(interval))
         }
     }

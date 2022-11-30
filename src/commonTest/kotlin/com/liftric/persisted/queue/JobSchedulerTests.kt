@@ -2,10 +2,7 @@ package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
 import kotlinx.coroutines.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFails
-import kotlin.test.assertFailsWith
+import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
 class JobSchedulerTests {
@@ -53,7 +50,7 @@ class JobSchedulerTests {
         val job = async {
             scheduler.onEvent.collect {
                 println(it)
-                if (it is Event.DidFail) {
+                if (it is JobEvent.DidFail) {
                     count += 1
                 }
             }
@@ -73,26 +70,28 @@ class JobSchedulerTests {
 
     @Test
     fun testCancel() {
+        val factory = TestFactory()
+        val scheduler = JobScheduler(factory)
+
         runBlocking {
-            val factory = TestFactory()
-            val scheduler = JobScheduler(factory)
-
-            assertFailsWith<CancellationException> {
-                launch {
-                    scheduler.onEvent.collect {
-                        cancel()
-                        scheduler.queue.cancel()
-                    }
+            scheduler.schedule<TestTask> {
+                rules {
+                    delay(10.seconds)
                 }
-
-                scheduler.schedule<TestTask> {
-                    rules {
-                        timeout(10.seconds)
-                    }
-                }
-
-                scheduler.queue.start()
             }
+
+            launch {
+                scheduler.onEvent.collect {
+                    println(it)
+                    if (it is JobEvent.DidEnd || it is JobEvent.DidFail) fail("Continued after run")
+                    if (it is JobEvent.WillRun) {
+                        scheduler.queue.cancel()
+                        cancel()
+                    }
+                }
+            }
+
+            scheduler.queue.start()
         }
     }
 }

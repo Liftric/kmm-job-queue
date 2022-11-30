@@ -44,11 +44,11 @@ class JobQueue(
     }
 
     suspend fun start() {
-        withContext(scope.coroutineContext) {
+        withContext(Dispatchers.Default) {
             while (isActive) {
                 delay(1000L)
                 if (_jobs.isEmpty()) break
-                if ((_jobs.first().startTime) <= Clock.System.now()) {
+                if (_jobs.first().startTime <= Clock.System.now()) {
                     submit {
                         val job = _jobs.removeFirst()
                         withTimeout(job.timeout) {

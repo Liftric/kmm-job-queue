@@ -9,7 +9,7 @@ import kotlin.time.Duration.Companion.seconds
 @Serializable
 data class DelayRule(val duration: Duration = 0.seconds): JobRule() {
     override suspend fun willRun(context: JobContext) {
-        context.broadcast(Event.Rule.WillRun(this, "Delaying job=${context.id} by duration=$duration"))
+        context.broadcast(RuleEvent.OnRun(this, "Delaying job=${context.id} by duration=$duration"))
         delay(duration)
     }
 }

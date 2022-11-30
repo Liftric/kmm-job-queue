@@ -25,12 +25,14 @@ data class Job(
         val event = try {
             rules.forEach { it.willRun(this@Job) }
 
+            delegate?.broadcast(JobEvent.WillRun(this@Job))
+
             task.body()
 
-            Event.DidEnd(this@Job)
+            JobEvent.DidEnd(this@Job)
         } catch (e: Error) {
             terminate()
-            Event.DidFail(this@Job, e)
+            JobEvent.DidFail(this@Job, e)
         }
 
         try {
@@ -39,7 +41,7 @@ data class Job(
             rules.forEach { it.willRemove(this@Job, event) }
         } catch (e: Error) {
             terminate()
-            Event.DidFailOnRemove(this@Job, e)
+            JobEvent.DidFailOnRemove(this@Job, e)
         }
     }
 
@@ -51,7 +53,7 @@ data class Job(
         delegate?.repeat(Job(id, timeout, task, tag, rules, startTime))
     }
 
-    override suspend fun broadcast(event: Event) {
+    override suspend fun broadcast(event: RuleEvent) {
         delegate?.broadcast(event)
     }
 }

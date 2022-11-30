@@ -8,8 +8,8 @@ import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 data class RetryRule(val limit: RetryLimit, val delay: Duration = 0.seconds): JobRule() {
-    override suspend fun willRemove(context: JobContext, result: Event) {
-        if (result is Event.DidFail) {
+    override suspend fun willRemove(context: JobContext, result: JobEvent) {
+        if (result is JobEvent.DidFail) {
             when (limit) {
                 is RetryLimit.Unlimited ->  {
                     context.repeat(startTime = Clock.System.now())
@@ -17,7 +17,7 @@ data class RetryRule(val limit: RetryLimit, val delay: Duration = 0.seconds): Jo
                 is RetryLimit.Limited -> {
                     if (limit.count > 0) {
                         val rules = context.rules.minus(this).plus(RetryRule(RetryLimit.Limited((limit.count + 1) - 2), delay))
-                        context.broadcast(Event.Rule.WillRemove(this, "Attempting to retry task=$context"))
+                        context.broadcast(RuleEvent.OnRemove(this, "Attempting to retry task=$context"))
                         context.repeat(rules = rules, startTime = Clock.System.now().plus(delay))
                     } else {
                         context.terminate()

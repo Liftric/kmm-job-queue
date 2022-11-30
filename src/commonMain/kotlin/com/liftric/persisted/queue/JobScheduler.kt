@@ -11,7 +11,7 @@ class JobScheduler(
     @PublishedApi
     internal val delegate = JobDelegate()
 
-    val onEvent = MutableSharedFlow<Event>(extraBufferCapacity = Int.MAX_VALUE)
+    val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
     init {
         delegate.onExit = { /* Do something */ }
@@ -34,11 +34,11 @@ class JobScheduler(
                 it.willSchedule(queue, job)
             }
 
-            onEvent.emit(Event.DidSchedule(job))
+            onEvent.emit(JobEvent.DidSchedule(job))
 
             queue.add(job)
         } catch (error: Error) {
-            onEvent.emit(Event.DidThrowOnSchedule(error))
+            onEvent.emit(JobEvent.DidThrowOnSchedule(error))
         }
     }
 
@@ -50,11 +50,11 @@ class JobScheduler(
                 it.willSchedule(queue, job)
             }
 
-            onEvent.emit(Event.DidScheduleRepeat(job))
+            onEvent.emit(JobEvent.DidScheduleRepeat(job))
 
             queue.add(job)
         } catch (error: Error) {
-            onEvent.emit(Event.DidThrowOnRepeat(error))
+            onEvent.emit(JobEvent.DidThrowOnRepeat(error))
         }
     }
 }
