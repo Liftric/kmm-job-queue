@@ -61,7 +61,7 @@ class JobQueue(
 
     suspend fun cancel() {
         isCancelling.withLock {
-            scope.cancel()
+            scope.coroutineContext.cancelChildren()
             queue.value.clear()
         }
     }

@@ -12,6 +12,10 @@ class TestErrorTask(override val params: Map<String, Any>): Task {
     override suspend fun body() {
         throw Error("Oh shoot!")
     }
+
+    override suspend fun onRepeat(cause: Throwable): Boolean {
+        return cause is Error
+    }
 }
 
 class LongRunningTask(override val params: Map<String, Any>): Task {

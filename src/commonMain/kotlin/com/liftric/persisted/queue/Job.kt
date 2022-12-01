@@ -5,7 +5,11 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlin.reflect.KClass
 import kotlin.time.Duration
+
+@Retention(AnnotationRetention.RUNTIME)
+annotation class RepeatOn(val clazz: KClass<Throwable>)
 
 @Serializable
 data class Job(
@@ -27,6 +31,8 @@ data class Job(
     var isCancelled: Boolean = false
         private set
 
+    private var canRepeat: Boolean = false
+
     internal suspend fun run() {
         coroutineScope {
             if (isCancelled) return@coroutineScope
@@ -42,6 +48,7 @@ data class Job(
                 } catch (e: CancellationException) {
                     JobEvent.DidCancel(this@Job, "Cancelled during run")
                 } catch (e: Error) {
+                    canRepeat = task.onRepeat(e)
                     JobEvent.DidFail(this@Job, e)
                 }
 
@@ -70,7 +77,11 @@ data class Job(
     }
 
     override suspend fun repeat(id: UUID, timeout: Duration, task: Task, tag: String?, rules: List<JobRule>, startTime: Instant) {
-        delegate?.repeat(Job(id, timeout, task, tag, rules, startTime))
+        if (canRepeat) {
+            delegate?.repeat(Job(id, timeout, task, tag, rules, startTime))
+        } else {
+            delegate?.broadcast(JobEvent.NotAllowedToRepeat(this@Job))
+        }
     }
 
     override suspend fun broadcast(event: RuleEvent) {
