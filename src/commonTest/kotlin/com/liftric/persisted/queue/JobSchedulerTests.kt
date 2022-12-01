@@ -49,10 +49,10 @@ class JobSchedulerTests {
         val scheduler = JobScheduler(factory)
 
         var count = 0
-        val job = async {
+        val job = launch {
             scheduler.onEvent.collect {
                 println(it)
-                if (it is JobEvent.DidFail) {
+                if (it is JobEvent.DidScheduleRepeat) {
                     count += 1
                 }
             }
@@ -60,14 +60,14 @@ class JobSchedulerTests {
 
         scheduler.schedule<TestErrorTask> {
             rules {
-                retry(RetryLimit.Limited(3), delay = 10.seconds)
+                retry(RetryLimit.Limited(3), delay = 1.seconds)
             }
         }
 
         scheduler.queue.start()
-        delay(1000L)
+        delay(10000L)
         job.cancel()
-        assertEquals(4, count)
+        assertEquals(3, count)
     }
 
     @Test

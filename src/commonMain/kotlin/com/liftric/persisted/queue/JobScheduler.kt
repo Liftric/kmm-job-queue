@@ -1,7 +1,6 @@
 package com.liftric.persisted.queue
 
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 
 class JobScheduler(
     val factory: TaskFactory,
@@ -18,11 +17,6 @@ class JobScheduler(
         delegate.onExit = { /* Do something */ }
         delegate.onRepeat = { repeat(it) }
         delegate.onEvent = { onEvent.emit(it) }
-        queue.scope.launch {
-            queue.onEvent.collect {
-                onEvent.emit(it)
-            }
-        }
     }
 
     suspend inline fun <reified T: Task> schedule() {

@@ -12,17 +12,20 @@ sealed class JobEvent {
     data class DidFailOnRemove(val job: JobContext, val error: Error): JobEvent()
 }
 
-sealed class RuleEvent: JobEvent() {
-    data class OnMutate(val rule: String, val message: String): RuleEvent() {
+sealed class RuleEvent(open val rule: String, open val message: String): JobEvent() {
+    data class OnMutate(override val rule: String, override val message: String): RuleEvent(rule, message) {
         constructor(rule: JobRule, message: String) : this(rule::class.simpleName!!, message)
     }
-    data class OnSchedule(val rule: String, val message: String): RuleEvent() {
+
+    data class OnSchedule(override val rule: String, override val message: String): RuleEvent(rule, message) {
         constructor(rule: JobRule, message: String) : this(rule::class.simpleName!!, message)
     }
-    data class OnRun(val rule: String, val message: String): RuleEvent() {
+
+    data class OnRun(override val rule: String, override val message: String): RuleEvent(rule, message) {
         constructor(rule: JobRule, message: String) : this(rule::class.simpleName!!, message)
     }
-    data class OnRemove(val rule: String, val message: String): RuleEvent() {
+
+    data class OnRemove(override val rule: String, override val message: String): RuleEvent(rule, message) {
         constructor(rule: JobRule, message: String) : this(rule::class.simpleName!!, message)
     }
 }

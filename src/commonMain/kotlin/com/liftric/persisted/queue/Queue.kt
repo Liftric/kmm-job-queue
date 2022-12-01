@@ -2,88 +2,82 @@ package com.liftric.persisted.queue
 
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.datetime.Clock
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 
 interface Queue {
     val scope: CoroutineScope
-    val jobs: List<com.liftric.persisted.queue.Job>
+    val jobs: List<JobContext>
+    val maxConcurrency: Int
 
     data class Configuration(
-        val scope: CoroutineScope
+        val scope: CoroutineScope,
+        val maxConcurrency: Int
     )
 }
 
 class JobQueue(
-    override val scope: CoroutineScope
+    override val scope: CoroutineScope,
+    override val maxConcurrency: Int
 ): Queue {
-    private val queue = MutableSharedFlow<Job>(extraBufferCapacity = Int.MAX_VALUE)
-
-    private val enquedJobs = atomic(mutableListOf<com.liftric.persisted.queue.Job>())
-    private val _jobs = atomic(mutableListOf<com.liftric.persisted.queue.Job>())
-    override val jobs: List<com.liftric.persisted.queue.Job>
-        get() = enquedJobs.value.plus(_jobs.value)
-
-    val onEvent: MutableSharedFlow<JobEvent> = MutableSharedFlow()
+    private val queue = atomic(mutableListOf<Job>())
+    private val lock = Semaphore(maxConcurrency, 0)
+    private val isCancelling = Mutex(false)
+    override val jobs: List<JobContext>
+        get() = queue.value
 
     constructor(configuration: Queue.Configuration?) : this(
-        configuration?.scope ?: CoroutineScope(Dispatchers.Default)
+        configuration?.scope ?: CoroutineScope(Dispatchers.Default),
+        configuration?.maxConcurrency ?: 1
     )
 
-    init {
-        queue.onEach { it.join() }
-            .flowOn(Dispatchers.Default)
-            .launchIn(scope)
-    }
-
     @PublishedApi
-    internal fun add(job: com.liftric.persisted.queue.Job) {
-        _jobs.value = _jobs.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
+    internal fun add(job: Job) {
+        queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
     }
 
     suspend fun start() {
-        withContext(Dispatchers.Default) {
-            while (isActive) {
-                delay(1000L)
-                if (_jobs.value.isEmpty()) break
-                if (_jobs.value.first().startTime <= Clock.System.now()) {
-                    submit {
-                        val job = _jobs.value.removeFirst()
-                        enquedJobs.value.add(job)
-                        withTimeout(job.timeout) {
-                            job.run()
-                        }
-                        enquedJobs.value.remove(job)
+        while (scope.isActive) {
+            delay(1000L)
+            if (queue.value.isEmpty()) break
+            if (isCancelling.isLocked) break
+            if (lock.availablePermits == 0) break
+            val job = queue.value.first()
+            if (job.isCancelled) break
+            if (job.startTime <= Clock.System.now()) {
+                lock.withPermit {
+                    withTimeout(job.timeout) {
+                        job.run()
+                        queue.value.remove(job)
                     }
                 }
             }
         }
     }
 
-    fun cancel() {
-        scope.cancel()
-    }
-
-    suspend fun cancel(id: UUID) {
-        _jobs.value.firstOrNull { it.id == id }?.apply {
-            _jobs.value.remove(this)
-            onEvent.emit(JobEvent.DidCancel(this, "Cancelled before run"))
-        } ?: run {
-            enquedJobs.value.firstOrNull { it.id == id }?.apply {
-                enquedJobs.value.remove(this)
-                onEvent.emit(JobEvent.DidCancel(this, "Cancelled before run"))
-            }?.cancel()
+    suspend fun cancel() {
+        isCancelling.withLock {
+            scope.cancel()
+            queue.value.clear()
         }
     }
 
-    private fun submit(
-        context: CoroutineContext = EmptyCoroutineContext,
-        block: suspend CoroutineScope.() -> Unit
-    ) {
-        val job = scope.launch(context, CoroutineStart.LAZY, block)
-        queue.tryEmit(job)
+    suspend fun cancel(id: UUID) {
+        isCancelling.withLock {
+            val job = queue.value.first { it.id == id }
+            job.cancel()
+            queue.value.remove(job)
+        }
+    }
+
+    suspend fun cancel(tag: String) {
+        isCancelling.withLock {
+            val job = queue.value.first { it.tag == tag }
+            job.cancel()
+            queue.value.remove(job)
+        }
     }
 }
