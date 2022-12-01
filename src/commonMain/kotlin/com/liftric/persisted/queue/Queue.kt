@@ -44,10 +44,11 @@ class JobQueue(
             delay(1000L)
             if (queue.value.isEmpty()) break
             if (isCancelling.isLocked) break
-            if (lock.availablePermits == 0) break
+            if (lock.availablePermits < 1) break
             val job = queue.value.first()
-            if (job.isCancelled) break
-            if (job.startTime <= Clock.System.now()) {
+            if (job.isCancelled) {
+                queue.value.remove(job)
+            } else if (job.startTime <= Clock.System.now()) {
                 lock.withPermit {
                     withTimeout(job.timeout) {
                         job.run()

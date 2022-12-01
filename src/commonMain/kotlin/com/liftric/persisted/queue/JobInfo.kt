@@ -10,11 +10,18 @@ data class JobInfo(
         private set
     var params: Map<String, String> = mapOf()
         private set
+    var persister: JobPersister? = null
+        private set
 
     fun rules(init: RuleInfo.() -> Unit): JobInfo {
         val info = RuleInfo()
         info.init()
         rules = info.rules.distinctBy { it::class }
+        return this
+    }
+
+    fun persist(persister: JobPersister): JobInfo {
+        this.persister = persister
         return this
     }
 

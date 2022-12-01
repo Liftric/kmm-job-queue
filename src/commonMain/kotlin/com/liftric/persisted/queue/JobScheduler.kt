@@ -20,7 +20,7 @@ class JobScheduler(
     }
 
     suspend inline fun <reified T: Task> schedule() {
-        schedule<T> { JobInfo() }
+        schedule<T> { this }
     }
 
     suspend inline fun <reified T: Task> schedule(init: JobInfo.() -> JobInfo) = try {

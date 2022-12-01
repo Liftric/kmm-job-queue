@@ -1,6 +1,6 @@
 # Persisted-queue
 
-Coroutine job scheduler inspired by `Android Work Manager` and `android-priority-jobqueue` for Kotlin Multiplatform projects. Run & repeat tasks sequentially (for now). Rebuild them from disk. Fine tune execution with rules.
+Coroutine job scheduler inspired by `Android Work Manager` and `android-priority-jobqueue` for Kotlin Multiplatform projects. Run & repeat tasks. Rebuild them from disk. Fine tune execution with rules.
 
 ## Rules
 
@@ -11,12 +11,35 @@ Coroutine job scheduler inspired by `Android Work Manager` and `android-priority
 - [x] Unique
 - [ ] Internet
 
+## Capabilities
+
+- [x] Cancellation (all, by id, by tag)
+
 ## Example
 
+Kotlin/Native doesn't have full reflection capabilities, thus we instantiate the job classes in a custom factory class.
+
 ```kotlin
-val factory = TaskFactory()
+class TestFactory: TaskFactory {
+    override fun <T : Task> create(type: KClass<T>, params: Map<String, Any>): Task = when(type) {
+        TestTask::class -> TestTask(params)
+        else -> throw Exception("Unknown job class!")
+    }
+}
+```
+
+Create a single instance of the scheduler on app start, and then start the queue to enqueue scheduled jobs.
+
+```kotlin
+val factory = TestFactory()
 val scheduler = JobScheduler(factory)
-val data = Data()
+scheduler.queue.start()
+```
+
+On job schedule you can add rules, define a store, and inject parameters.
+
+````kotlin
+val data = ...
 
 scheduler.schedule<UploadTask> {
     rules {
@@ -24,11 +47,18 @@ scheduler.schedule<UploadTask> {
         unique(data.id)
         timeout(60.seconds)
     }
+    persist(Store.Preferences)
     params(
         "result" to data.value, 
         "timestamp" to data.date
     )
 }
+````
 
-scheduler.queue.start()
+You can subscribe to life cycle events (e.g. for logging).
+
+```kotlin
+scheduler.onEvent.collect { event ->
+    Logger.info(event)
+}
 ```

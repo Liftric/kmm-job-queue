@@ -61,6 +61,7 @@ data class Job(
     }
 
     override suspend fun cancel() {
+        if (isCancelled) return
         isCancelled = true
         cancellable?.cancel(CancellationException("Cancelled during run")) ?: run {
             delegate?.broadcast(JobEvent.DidCancel(this@Job, "Cancelled before run"))
