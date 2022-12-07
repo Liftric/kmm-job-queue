@@ -9,6 +9,7 @@ data class NetworkRule(val networkType: NetworkType) : JobRule() {
 
 sealed class NetworkType {
     object NoConnection : NetworkType()
+    object Undefined: NetworkType()
     object Cellular : NetworkType()
     object Wifi : NetworkType()
 }

@@ -16,7 +16,10 @@ actual class NetworkConnection {
                 return when {
                     capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkType.Wifi
                     capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkType.Cellular
-                    else -> NetworkType.NoConnection
+                    else -> {
+                        val connected = getCurrentConnectivityState(connectivityManager)
+                        if (connected) return NetworkType.Undefined else NetworkType.NoConnection
+                    }
                 }
             }
         } else {
@@ -24,10 +27,13 @@ actual class NetworkConnection {
             return when (activeNetworkInfo?.type) {
                 ConnectivityManager.TYPE_WIFI -> NetworkType.Wifi
                 ConnectivityManager.TYPE_MOBILE -> NetworkType.Cellular
-                else -> NetworkType.NoConnection
+                else -> {
+                    val connected = getCurrentConnectivityState(connectivityManager)
+                    if (connected) return NetworkType.Undefined else NetworkType.NoConnection
+                }
             }
         }
-        return NetworkType.NoConnection
+        return NetworkType.Undefined
     }
 
     fun getCurrentConnectivityState(
