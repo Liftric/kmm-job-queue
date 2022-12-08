@@ -4,36 +4,38 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
-import com.liftric.persisted.queue.rules.NetworkType
+import com.liftric.persisted.queue.rules.ConnectionType
+
+actual typealias Context = Context
 
 actual class NetworkConnection {
-    fun getConnectionType(context: Context?): NetworkType {
-        if (context == null) return NetworkType.NoConnection
+    actual fun getConnectionType(context: Context?): ConnectionType {
+        if (context == null) return ConnectionType.NotConnected()
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
             if (capabilities != null) {
                 return when {
-                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkType.Wifi
-                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkType.Cellular
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> ConnectionType.Wifi()
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> ConnectionType.Cellular()
                     else -> {
                         val connected = getCurrentConnectivityState(connectivityManager)
-                        if (connected) return NetworkType.Undefined else NetworkType.NoConnection
+                        if (connected) return ConnectionType.Undefined() else ConnectionType.NotConnected()
                     }
                 }
             }
         } else {
             val activeNetworkInfo = connectivityManager.activeNetworkInfo
             return when (activeNetworkInfo?.type) {
-                ConnectivityManager.TYPE_WIFI -> NetworkType.Wifi
-                ConnectivityManager.TYPE_MOBILE -> NetworkType.Cellular
+                ConnectivityManager.TYPE_WIFI -> ConnectionType.Wifi()
+                ConnectivityManager.TYPE_MOBILE -> ConnectionType.Cellular()
                 else -> {
                     val connected = getCurrentConnectivityState(connectivityManager)
-                    if (connected) return NetworkType.Undefined else NetworkType.NoConnection
+                    if (connected) return ConnectionType.Undefined() else ConnectionType.NotConnected()
                 }
             }
         }
-        return NetworkType.Undefined
+        return ConnectionType.NotConnected()
     }
 
     fun getCurrentConnectivityState(
