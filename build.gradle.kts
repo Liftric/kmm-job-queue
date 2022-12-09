@@ -34,6 +34,9 @@ kotlin {
             dependencies {
                 implementation(libs.kotlinx.coroutines)
                 implementation(libs.kotlinx.serialization)
+                implementation(libs.kotlinx.datetime)
+                implementation(libs.kotlinx.atomicfu)
+                implementation(libs.multiplatform.settings)
             }
         }
         val commonTest by getting {
