@@ -20,7 +20,7 @@ actual object UUIDSerializer: KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): UUID {
-        return Test::`class`.invoke()
+        return UUID(decoder.decodeString())
     }
 
     override fun serialize(encoder: Encoder, value: UUID) {
