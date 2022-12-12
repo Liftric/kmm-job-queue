@@ -17,43 +17,34 @@ Coroutine job scheduler inspired by `Android Work Manager` and `android-priority
 
 ## Example
 
-Kotlin/Native doesn't have full reflection capabilities, thus we instantiate the job classes in a custom factory class.
+Define a task by implementing the interface. Define a body and limit in which cases the task can repeat.
 
 ```kotlin
-class TestFactory: TaskFactory {
-    override fun <T : Task> create(type: KClass<T>, params: Map<String, Any>): Task = when(type) {
-        TestTask::class -> TestTask(params)
-        else -> throw Exception("Unknown job class!")
-    }
+@Serializable
+class SyncTask: Task {
+    override suspend fun body() { /* Do something */ }
+    override suspend fun onRepeat(cause: Throwable): Boolean { cause is NetworkException }
 }
 ```
 
 Create a single instance of the scheduler on app start, and then start the queue to enqueue scheduled jobs.
 
 ```kotlin
-val factory = TestFactory()
-val scheduler = JobScheduler(factory)
+val scheduler = JobScheduler()
 scheduler.queue.start()
 ```
 
-On job schedule you can add rules, define a store, and inject parameters.
+On job schedule you can add rules and add your own data store.
 
-````kotlin
-val data = ...
-
-scheduler.schedule<UploadTask> {
+```kotlin
+scheduler.schedule(::SyncTask) {
     rules {
         retry(RetryLimit.Limited(3), delay = 30.seconds)
         unique(data.id)
         timeout(60.seconds)
     }
-    persist(Store.Preferences)
-    params(
-        "result" to data.value, 
-        "timestamp" to data.date
-    )
 }
-````
+```
 
 You can subscribe to life cycle events (e.g. for logging).
 

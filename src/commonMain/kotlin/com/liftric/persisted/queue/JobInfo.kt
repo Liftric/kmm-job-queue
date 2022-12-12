@@ -7,11 +7,7 @@ data class JobInfo(
     var timeout: Duration = Duration.INFINITE
 ) {
     var rules: List<JobRule> = listOf()
-        private set
-    var params: Map<String, String> = mapOf()
-        private set
     var persister: JobPersister? = null
-        private set
 
     fun rules(init: RuleInfo.() -> Unit): JobInfo {
         val info = RuleInfo()
@@ -22,11 +18,6 @@ data class JobInfo(
 
     fun persist(persister: JobPersister): JobInfo {
         this.persister = persister
-        return this
-    }
-
-    fun params(vararg params: Pair<String, String>): JobInfo {
-        this.params = params.toMap()
         return this
     }
 }

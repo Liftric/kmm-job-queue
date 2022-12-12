@@ -3,6 +3,7 @@ package com.liftric.persisted.queue
 import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlin.reflect.KClass
@@ -11,9 +12,7 @@ import kotlin.time.Duration
 @Retention(AnnotationRetention.RUNTIME)
 annotation class RepeatOn(val clazz: KClass<Throwable>)
 
-@Serializable
 data class Job(
-    @Serializable(with = UUIDSerializer::class)
     override val id: UUID,
     override val timeout: Duration,
     override val task: Task,

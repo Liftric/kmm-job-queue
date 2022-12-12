@@ -1,25 +1,20 @@
 package com.liftric.persisted.queue
 
 import kotlinx.coroutines.delay
+import kotlinx.serialization.Serializable
 
-class TestTask(override val params: Map<String, Any>): Task {
-    private val testResultId: String by params
+@Serializable
+data class TestData(val testResultId: String)
 
-    override suspend fun body() { }
+class TestTask(val data: TestData): Task {
+    override suspend fun body() {  }
 }
 
-class TestErrorTask(override val params: Map<String, Any>): Task {
-    override suspend fun body() {
-        throw Error("Oh shoot!")
-    }
-
-    override suspend fun onRepeat(cause: Throwable): Boolean {
-        return cause is Error
-    }
+class TestErrorTask: Task {
+    override suspend fun body() {  throw Error("Oh shoot!") }
+    override suspend fun onRepeat(cause: Throwable): Boolean = cause is Error
 }
 
-class LongRunningTask(override val params: Map<String, Any>): Task {
-    override suspend fun body() {
-        delay(10000L)
-    }
+class LongRunningTask: Task {
+    override suspend fun body() { delay(10000L) }
 }

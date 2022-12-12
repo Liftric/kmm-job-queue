@@ -1,11 +1,12 @@
 package com.liftric.persisted.queue
 
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlin.reflect.KClass
+fun <Data> create(factory: () -> Data): Data = factory()
 
-class JobScheduler(
-    val factory: TaskFactory,
-    configuration: Queue.Configuration? = null
-) {
+class JobScheduler(configuration: Queue.Configuration? = null) {
     val queue = JobQueue(configuration)
 
     @PublishedApi
@@ -19,16 +20,14 @@ class JobScheduler(
         delegate.onEvent = { onEvent.emit(it) }
     }
 
-    suspend inline fun <reified T: Task> schedule() {
-        schedule<T> { this }
+    suspend fun schedule(task: () -> Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+        schedule(task(), configure)
     }
 
-    suspend inline fun <reified T: Task> schedule(init: JobInfo.() -> JobInfo) = try {
-        val info = init(JobInfo()).apply {
+    suspend fun schedule(task: Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
+        val info = configure(JobInfo()).apply {
             rules.forEach { it.mutating(this) }
         }
-
-        val task = factory.create(T::class, info.params)
 
         val job = Job(task, info)
         job.delegate = delegate
