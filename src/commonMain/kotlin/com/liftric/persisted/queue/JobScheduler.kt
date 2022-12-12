@@ -8,11 +8,9 @@ fun <Data> create(factory: () -> Data): Data = factory()
 
 class JobScheduler(configuration: Queue.Configuration? = null) {
     val queue = JobQueue(configuration)
-
-    @PublishedApi
-    internal val delegate = JobDelegate()
-
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
+
+    private val delegate = JobDelegate()
 
     init {
         delegate.onExit = { /* Do something */ }

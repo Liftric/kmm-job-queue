@@ -14,8 +14,6 @@ actual typealias UUID = NSUUID
 
 actual fun KClass<UUID>.instance(): UUID = NSUUID()
 
-data class Testt(val d: String)
-
 actual object UUIDSerializer: KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)
 
