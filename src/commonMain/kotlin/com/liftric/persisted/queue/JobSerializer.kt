@@ -1,6 +1,6 @@
 package com.liftric.persisted.queue
 
-interface JobPersister {
+interface JobSerializer {
     val tag: String
     fun store(job: Job)
     fun retrieve(id: String): Job?

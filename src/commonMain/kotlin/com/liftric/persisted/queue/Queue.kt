@@ -9,9 +9,8 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.datetime.Clock
 
 interface Queue {
-    val scope: CoroutineScope
     val jobs: List<JobContext>
-    val maxConcurrency: Int
+    val configuration: Configuration
 
     data class Configuration(
         val scope: CoroutineScope,
@@ -19,28 +18,21 @@ interface Queue {
     )
 }
 
-class JobQueue(
-    override val scope: CoroutineScope,
-    override val maxConcurrency: Int
-): Queue {
+class JobQueue(override val configuration: Queue.Configuration): Queue {
     private val queue = atomic(mutableListOf<Job>())
-    private val lock = Semaphore(maxConcurrency, 0)
+    private val lock = Semaphore(configuration.maxConcurrency, 0)
     private val isCancelling = Mutex(false)
     override val jobs: List<JobContext>
         get() = queue.value
 
-    constructor(configuration: Queue.Configuration?) : this(
-        configuration?.scope ?: CoroutineScope(Dispatchers.Default),
-        configuration?.maxConcurrency ?: 1
-    )
+    constructor(configuration: Queue.Configuration?) : this(configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1))
 
-    @PublishedApi
     internal fun add(job: Job) {
         queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
     }
 
     suspend fun start() {
-        while (scope.isActive) {
+        while (configuration.scope.isActive) {
             delay(1000L)
             if (queue.value.isEmpty()) break
             if (isCancelling.isLocked) break
@@ -61,7 +53,7 @@ class JobQueue(
 
     suspend fun cancel() {
         isCancelling.withLock {
-            scope.coroutineContext.cancelChildren()
+            configuration.scope.coroutineContext.cancelChildren()
             queue.value.clear()
         }
     }

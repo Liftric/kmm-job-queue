@@ -4,7 +4,10 @@ import kotlinx.coroutines.flow.*
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.serializerOrNull
 
-class JobScheduler(configuration: Queue.Configuration? = null) {
+class JobScheduler(
+    configuration: Queue.Configuration? = null,
+    private val serializer: JobSerializer? = null
+) {
     val queue = JobQueue(configuration)
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 

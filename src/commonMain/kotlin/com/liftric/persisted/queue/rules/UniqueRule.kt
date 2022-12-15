@@ -18,7 +18,7 @@ data class UniqueRule(private val tag: String? = null): JobRule() {
     }
 }
 
-fun RuleInfo.unique(tag: String? = null): RuleInfo {
+fun JobInfo.unique(tag: String? = null): JobInfo {
     val rule = UniqueRule(tag)
     rules.add(rule)
     return this

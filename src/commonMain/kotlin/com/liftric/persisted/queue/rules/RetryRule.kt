@@ -32,7 +32,7 @@ sealed class RetryLimit {
     object Unlimited: RetryLimit()
 }
 
-fun RuleInfo.retry(limit: RetryLimit, delay: Duration = 0.seconds): RuleInfo {
+fun JobInfo.retry(limit: RetryLimit, delay: Duration = 0.seconds): JobInfo {
     val rule = RetryRule(limit, delay)
     rules.add(rule)
     return this

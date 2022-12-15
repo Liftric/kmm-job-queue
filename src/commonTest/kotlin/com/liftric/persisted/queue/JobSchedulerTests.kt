@@ -17,16 +17,12 @@ class JobSchedulerTests {
         }
 
         scheduler.schedule(TestTask(TestData(id))) {
-            rules {
-                delay(1.seconds)
-                unique(id)
-            }
+            delay(1.seconds)
+            unique(id)
         }
 
         scheduler.schedule(TestTask(TestData(id))) {
-            rules {
-                unique(id)
-            }
+            unique(id)
         }
 
         assertEquals(1, scheduler.queue.jobs.count())
@@ -55,9 +51,7 @@ class JobSchedulerTests {
         }
 
         scheduler.schedule(TestErrorTask()) {
-            rules {
-                retry(RetryLimit.Limited(3), delay = 1.seconds)
-            }
+            retry(RetryLimit.Limited(3), delay = 1.seconds)
         }
 
         scheduler.queue.start()
@@ -72,9 +66,7 @@ class JobSchedulerTests {
 
         runBlocking {
             scheduler.schedule(LongRunningTask()) {
-                rules {
-                    delay(10.seconds)
-                }
+                delay(10.seconds)
             }
 
             launch {
@@ -119,9 +111,7 @@ class JobSchedulerTests {
             delay(1000L)
 
             scheduler.schedule(::LongRunningTask) {
-                rules {
-                    delay(2.seconds)
-                }
+                delay(2.seconds)
             }
 
             scheduler.queue.cancel(completable.await())
@@ -137,9 +127,7 @@ class JobSchedulerTests {
         runBlocking {
             launch {
                 scheduler.schedule(::LongRunningTask) {
-                    rules {
-                        delay(0.seconds)
-                    }
+                    delay(0.seconds)
                 }
             }
 
@@ -159,9 +147,7 @@ class JobSchedulerTests {
             scheduler.queue.start()
 
             scheduler.schedule(::LongRunningTask) {
-                rules {
-                    delay(30.seconds)
-                }
+                delay(30.seconds)
             }
         }
     }
