@@ -17,32 +17,38 @@ Coroutine job scheduler inspired by `Android Work Manager` and `android-priority
 
 ## Example
 
-Define a task by implementing the interface. Define a body and limit in which cases the task can repeat.
+Define a `DataTask<*>` or a `Task` (`DataTask<Unit>`), customize its body and limit when it should repeat.
+
+⚠️ Make sure the data you pass into the task is serializable.
 
 ```kotlin
 @Serializable
-class SyncTask: Task {
+data class UploadData(val id: String)
+
+class UploadTask(data: UploadData): DataTask<UploadData>(data) {
     override suspend fun body() { /* Do something */ }
     override suspend fun onRepeat(cause: Throwable): Boolean { cause is NetworkException }
 }
 ```
 
-Create a single instance of the scheduler on app start, and then start the queue to enqueue scheduled jobs.
+Create a single instance of the scheduler on app start. To start enqueuing jobs run `queue.start()`.
+
+You can pass a `Queue.Configuration` or a custom `JobSerializer` to the scheduler.
 
 ```kotlin
 val scheduler = JobScheduler()
 scheduler.queue.start()
 ```
 
-On job schedule you can add rules and add your own data store.
+You can customize the jobs life cycle during schedule by defining rules.
 
 ```kotlin
-scheduler.schedule(::SyncTask) {
-    rules {
-        retry(RetryLimit.Limited(3), delay = 30.seconds)
-        unique(data.id)
-        timeout(60.seconds)
-    }
+val data = UploadData(id = ...)
+        
+scheduler.schedule(UploadTask(data)) {
+    unique(data.id)
+    retry(RetryLimit.Limited(3), delay = 30.seconds)
+    persist()
 }
 ```
 
