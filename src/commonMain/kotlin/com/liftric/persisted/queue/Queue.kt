@@ -29,8 +29,6 @@ class JobQueue(override val configuration: Queue.Configuration): Queue {
     override val jobs: List<JobContext>
         get() = queue.value
 
-    constructor(configuration: Queue.Configuration?) : this(configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1))
-
     init {
         cancellationQueue.onEach { it.join() }
             .flowOn(Dispatchers.Default)

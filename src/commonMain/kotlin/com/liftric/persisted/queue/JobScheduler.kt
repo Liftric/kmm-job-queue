@@ -1,5 +1,7 @@
 package com.liftric.persisted.queue
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.serializerOrNull
@@ -8,7 +10,7 @@ class JobScheduler(
     configuration: Queue.Configuration? = null,
     private val serializer: JobSerializer? = null
 ) {
-    val queue = JobQueue(configuration)
+    val queue = JobQueue(configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1))
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
     private val delegate = JobDelegate()
