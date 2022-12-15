@@ -1,10 +1,8 @@
 package com.liftric.persisted.queue
 
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlin.reflect.KClass
-fun <Data> create(factory: () -> Data): Data = factory()
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.serializerOrNull
 
 class JobScheduler(configuration: Queue.Configuration? = null) {
     val queue = JobQueue(configuration)
@@ -18,14 +16,17 @@ class JobScheduler(configuration: Queue.Configuration? = null) {
         delegate.onEvent = { onEvent.emit(it) }
     }
 
-    suspend fun schedule(task: () -> Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+    suspend fun schedule(task: () -> DataTask<*>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
         schedule(task(), configure)
     }
 
-    suspend fun schedule(task: Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
+    @OptIn(InternalSerializationApi::class)
+    suspend fun schedule(task: DataTask<*>, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
         val info = configure(JobInfo()).apply {
             rules.forEach { it.mutating(this) }
         }
+
+        if (task.data!!::class.serializerOrNull() == null) throw Exception("Data must be serializable")
 
         val job = Job(task, info)
         job.delegate = delegate

@@ -3,24 +3,19 @@ package com.liftric.persisted.queue
 import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlin.time.Duration
 
-@Serializable
 data class Job(
-    @Serializable(with = UUIDSerializer::class)
     override val id: UUID,
     override val timeout: Duration,
-    override val task: Task,
+    override val task: DataTask<*>,
     override val tag: String?,
     override val rules: List<JobRule>,
     override val startTime: Instant = Clock.System.now()
 ): JobContext {
-    @Transient
     var delegate: JobDelegate? = null
 
-    constructor(task: Task, info: JobInfo) : this (UUID::class.instance(), info.timeout, task, info.tag, info.rules)
+    constructor(task: DataTask<*>, info: JobInfo) : this (UUID::class.instance(), info.timeout, task, info.tag, info.rules)
 
     private var cancellable: kotlinx.coroutines.Job? = null
 
@@ -72,7 +67,7 @@ data class Job(
         delegate?.exit()
     }
 
-    override suspend fun repeat(id: UUID, timeout: Duration, task: Task, tag: String?, rules: List<JobRule>, startTime: Instant) {
+    override suspend fun repeat(id: UUID, timeout: Duration, task: DataTask<*>, tag: String?, rules: List<JobRule>, startTime: Instant) {
         if (canRepeat) {
             delegate?.repeat(Job(id, timeout, task, tag, rules, startTime))
         } else {

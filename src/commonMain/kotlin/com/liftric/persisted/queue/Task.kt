@@ -1,7 +1,13 @@
 package com.liftric.persisted.queue
 
-interface Task {
+import kotlinx.serialization.Serializable
+
+@Serializable
+abstract class DataTask<Data>(val data: Data) {
     @Throws(Throwable::class)
-    suspend fun body()
-    suspend fun onRepeat(cause: Throwable): Boolean = false
+    abstract suspend fun body()
+    open suspend fun onRepeat(cause: Throwable): Boolean = false
 }
+
+@Serializable
+abstract class Task: DataTask<Unit>(Unit)
