@@ -7,15 +7,13 @@ import kotlin.time.Duration
 
 class Job(
     override val id: UUID,
-    override val timeout: Duration,
+    override val info: JobInfo,
     override val task: DataTask<*>,
-    override val tag: String?,
-    override val rules: List<JobRule>,
     override val startTime: Instant = Clock.System.now()
 ): JobContext {
     var delegate: JobDelegate? = null
 
-    constructor(task: DataTask<*>, info: JobInfo) : this (UUID::class.instance(), info.timeout, task, info.tag, info.rules)
+    constructor(task: DataTask<*>, info: JobInfo) : this (UUID::class.instance(), info, task)
 
     private var cancellable: kotlinx.coroutines.Job? = null
 
@@ -29,7 +27,7 @@ class Job(
             if (isCancelled) return@coroutineScope
             cancellable = launch {
                 val event = try {
-                    rules.forEach { it.willRun(this@Job) }
+                    info.rules.forEach { it.willRun(this@Job) }
 
                     delegate?.broadcast(JobEvent.WillRun(this@Job))
 
@@ -48,7 +46,7 @@ class Job(
 
                     if (isCancelled) return@launch
 
-                    rules.forEach { it.willRemove(this@Job, event) }
+                    info.rules.forEach { it.willRemove(this@Job, event) }
                 } catch (e: CancellationException) {
                     delegate?.broadcast(JobEvent.DidCancel(this@Job, "Cancelled after run"))
                 } catch (e: Error) {
@@ -67,9 +65,9 @@ class Job(
         delegate?.exit()
     }
 
-    override suspend fun repeat(id: UUID, timeout: Duration, task: DataTask<*>, tag: String?, rules: List<JobRule>, startTime: Instant) {
+    override suspend fun repeat(id: UUID, info: JobInfo, task: DataTask<*>, startTime: Instant) {
         if (canRepeat) {
-            delegate?.repeat(Job(id, timeout, task, tag, rules, startTime))
+            delegate?.repeat(Job(id, info, task, startTime))
         } else {
             delegate?.broadcast(JobEvent.NotAllowedToRepeat(this@Job))
         }

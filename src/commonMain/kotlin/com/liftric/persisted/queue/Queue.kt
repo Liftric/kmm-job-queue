@@ -42,7 +42,7 @@ class JobQueue(override val configuration: Queue.Configuration): Queue {
                 queue.value.remove(job)
             } else if (job.startTime <= Clock.System.now()) {
                 lock.withPermit {
-                    withTimeout(job.timeout) {
+                    withTimeout(job.info.timeout) {
                         job.run()
                         queue.value.remove(job)
                     }
@@ -68,7 +68,7 @@ class JobQueue(override val configuration: Queue.Configuration): Queue {
 
     suspend fun cancel(tag: String) {
         isCancelling.withLock {
-            val job = queue.value.first { it.tag == tag }
+            val job = queue.value.first { it.info.tag == tag }
             job.cancel()
             queue.value.remove(job)
         }

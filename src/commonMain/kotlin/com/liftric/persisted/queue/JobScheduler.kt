@@ -34,7 +34,7 @@ class JobScheduler(
         val job = Job(task, info)
         job.delegate = delegate
 
-        job.rules.forEach {
+        job.info.rules.forEach {
             it.willSchedule(queue, job)
         }
 
@@ -48,7 +48,7 @@ class JobScheduler(
     private suspend fun repeat(job: Job) = try {
         job.delegate = delegate
 
-        job.rules.forEach {
+        job.info.rules.forEach {
             it.willSchedule(queue, job)
         }
 
