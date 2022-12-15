@@ -5,7 +5,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.time.Duration
 
-data class Job(
+class Job(
     override val id: UUID,
     override val timeout: Duration,
     override val task: DataTask<*>,
