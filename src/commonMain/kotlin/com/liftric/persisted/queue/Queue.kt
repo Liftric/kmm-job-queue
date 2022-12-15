@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.datetime.Clock
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.coroutineContext
 
 interface Queue {
     val jobs: List<JobContext>
@@ -41,7 +42,6 @@ class JobQueue(override val configuration: Queue.Configuration): Queue {
 
     suspend fun start() {
         while (configuration.scope.isActive) {
-            delay(1000L)
             if (queue.value.isEmpty()) break
             if (isCancelling.isLocked) break
             if (lock.availablePermits < 1) break
@@ -60,7 +60,7 @@ class JobQueue(override val configuration: Queue.Configuration): Queue {
     }
 
     suspend fun cancel() {
-        submitCancellation {
+        submitCancellation(coroutineContext) {
             isCancelling.withLock {
                 configuration.scope.coroutineContext.cancelChildren()
                 queue.value.clear()
@@ -69,7 +69,7 @@ class JobQueue(override val configuration: Queue.Configuration): Queue {
     }
 
     suspend fun cancel(id: UUID) {
-        submitCancellation {
+        submitCancellation(coroutineContext) {
             isCancelling.withLock {
                 queue.value.firstOrNull { it.id == id }?.let { job ->
                     job.cancel()
@@ -80,7 +80,7 @@ class JobQueue(override val configuration: Queue.Configuration): Queue {
     }
 
     suspend fun cancel(tag: String) {
-        submitCancellation {
+        submitCancellation(coroutineContext) {
             isCancelling.withLock {
                 queue.value.firstOrNull { it.info.tag == tag }?.let { job ->
                     job.cancel()

@@ -96,10 +96,10 @@ class JobSchedulerTests {
 
             launch {
                 scheduler.onEvent.collect {
+                    println(it)
                     if (it is JobEvent.DidEnd || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.DidSchedule) {
                         completable.complete(it.job.id)
-                        cancel()
                     }
                     if (it is JobEvent.DidCancel) {
                         assertTrue(scheduler.queue.jobs.isEmpty())
@@ -115,8 +115,6 @@ class JobSchedulerTests {
             }
 
             scheduler.queue.cancel(completable.await())
-
-            assertTrue(scheduler.queue.jobs.isEmpty())
         }
     }
 
@@ -125,12 +123,6 @@ class JobSchedulerTests {
         val scheduler = JobScheduler()
 
         runBlocking {
-            launch {
-                scheduler.schedule(::LongRunningTask) {
-                    delay(0.seconds)
-                }
-            }
-
             launch {
                 scheduler.onEvent.collect {
                     println(it)
@@ -144,10 +136,12 @@ class JobSchedulerTests {
                 }
             }
 
+            delay(1000L)
+
             scheduler.queue.start()
 
             scheduler.schedule(::LongRunningTask) {
-                delay(30.seconds)
+                delay(10.seconds)
             }
         }
     }
