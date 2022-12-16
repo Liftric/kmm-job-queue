@@ -2,9 +2,9 @@ package com.liftric.persisted.queue.rules
 
 import com.liftric.persisted.queue.*
 import kotlinx.coroutines.delay
-import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class DelayRule(val duration: Duration = 0.seconds): JobRule() {

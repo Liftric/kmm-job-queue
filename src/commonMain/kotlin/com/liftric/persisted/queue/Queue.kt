@@ -24,7 +24,7 @@ interface Queue {
 
 class JobQueue(override val configuration: Queue.Configuration): Queue {
     private val cancellationQueue = MutableSharedFlow<kotlinx.coroutines.Job>(extraBufferCapacity = Int.MAX_VALUE)
-    private val queue = atomic(mutableListOf<Job>())
+    private val queue = atomic(mutableListOf<Job<*>>())
     private val lock = Semaphore(configuration.maxConcurrency, 0)
     private val isCancelling = Mutex(false)
     override val jobs: List<JobContext>
@@ -36,7 +36,8 @@ class JobQueue(override val configuration: Queue.Configuration): Queue {
             .launchIn(configuration.scope)
     }
 
-    internal fun add(job: Job) {
+    @PublishedApi
+    internal fun add(job: Job<*>) {
         queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
     }
 

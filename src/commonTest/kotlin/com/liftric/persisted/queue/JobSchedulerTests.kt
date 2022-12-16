@@ -2,13 +2,19 @@ package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
 import kotlinx.coroutines.*
+import kotlinx.serialization.modules.SerializersModule
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.modules.polymorphic
 
 class JobSchedulerTests {
     @Test
     fun testSchedule() = runBlocking {
-        val scheduler = JobScheduler()
+        val scheduler = JobScheduler(serializers = SerializersModule {
+            polymorphic(DataTask::class) {
+                subclass(TestTask::class, TestTask.serializer())
+            }
+        })
         val id = UUID::class.instance().toString()
         val job = async {
             scheduler.onEvent.collect {
@@ -16,7 +22,7 @@ class JobSchedulerTests {
             }
         }
 
-        scheduler.schedule(TestTask(TestData(id))) {
+        scheduler.schedule(TestData(id), ::TestTask) {
             delay(1.seconds)
             unique(id)
         }

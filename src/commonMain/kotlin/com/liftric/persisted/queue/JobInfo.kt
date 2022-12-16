@@ -1,7 +1,9 @@
 package com.liftric.persisted.queue
 
 import kotlin.time.Duration
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class JobInfo(
     var tag: String? = null,
     var timeout: Duration = Duration.INFINITE,

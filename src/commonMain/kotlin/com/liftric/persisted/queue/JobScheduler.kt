@@ -1,19 +1,41 @@
 package com.liftric.persisted.queue
 
+import com.liftric.persisted.queue.rules.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.InternalSerializationApi
-import kotlinx.serialization.serializerOrNull
+import kotlinx.datetime.serializers.InstantIso8601Serializer
+import kotlinx.serialization.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
+import kotlinx.serialization.modules.plus
+import kotlinx.serialization.modules.polymorphic
 
 class JobScheduler(
-    configuration: Queue.Configuration? = null,
-    private val serializer: JobSerializer? = null
+    serializers: SerializersModule = SerializersModule {},
+    configuration: Queue.Configuration? = null
 ) {
     val queue = JobQueue(configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1))
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
-    private val delegate = JobDelegate()
+     private val module = SerializersModule {
+        contextual(UUIDSerializer)
+        contextual(InstantIso8601Serializer)
+        polymorphic(JobRule::class) {
+            subclass(DelayRule::class, DelayRule.serializer())
+            subclass(PeriodicRule::class, PeriodicRule.serializer())
+            subclass(RetryRule::class, RetryRule.serializer())
+            subclass(TimeoutRule::class, TimeoutRule.serializer())
+            subclass(UniqueRule::class, UniqueRule.serializer())
+            subclass(PersistenceRule::class, PersistenceRule.serializer())
+        }
+     }
+
+    val format = Json { serializersModule = module.plus(serializers) }
+
+    @PublishedApi
+    internal val delegate = JobDelegate()
 
     init {
         delegate.onExit = { /* Do something */ }
@@ -21,20 +43,23 @@ class JobScheduler(
         delegate.onEvent = { onEvent.emit(it) }
     }
 
-    suspend fun schedule(task: () -> DataTask<*>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+    suspend fun schedule(task: () -> DataTask<Unit>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
         schedule(task(), configure)
     }
 
-    @OptIn(InternalSerializationApi::class)
-    suspend fun schedule(task: DataTask<*>, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
+    suspend inline fun <reified Data> schedule(data: Data, task: (Data) -> DataTask<Data>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+        schedule(task(data), configure)
+    }
+
+    suspend inline fun <reified Data> schedule(task: DataTask<Data>, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
         val info = configure(JobInfo()).apply {
             rules.forEach { it.mutating(this) }
         }
 
-        if (task.data!!::class.serializerOrNull() == null) throw Exception("Data must be serializable")
-
         val job = Job(task, info)
         job.delegate = delegate
+
+        println(format.encodeToString(job))
 
         job.info.rules.forEach {
             it.willSchedule(queue, job)
@@ -47,7 +72,7 @@ class JobScheduler(
         onEvent.emit(JobEvent.DidThrowOnSchedule(error))
     }
 
-    private suspend fun repeat(job: Job) = try {
+    private suspend fun repeat(job: Job<*>) = try {
         job.delegate = delegate
 
         job.info.rules.forEach {
