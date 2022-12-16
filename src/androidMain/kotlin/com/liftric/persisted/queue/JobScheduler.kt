@@ -1,15 +1,15 @@
 package com.liftric.persisted.queue
 
 import android.content.Context
+import com.russhwolf.settings.SharedPreferencesSettings
 import kotlinx.serialization.modules.SerializersModule
 
 actual class JobScheduler(
     context: Context,
     serializers: SerializersModule = SerializersModule {},
     configuration: Queue.Configuration? = null,
-    filePath: String? = null
 ) : AbstractJobScheduler(
     serializers,
     configuration,
-    filePath ?: context.filesDir.path
+    SharedPreferencesSettings.Factory(context).create("com.liftric.persisted.queue")
 )

@@ -1,7 +1,7 @@
 package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
-import io.github.xxfast.kstore.*
+import com.russhwolf.settings.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -14,13 +14,12 @@ import kotlinx.serialization.modules.polymorphic
 
 expect class JobScheduler: AbstractJobScheduler
 abstract class AbstractJobScheduler(
-    serializers: SerializersModule = SerializersModule {},
-    configuration: Queue.Configuration? = null,
-    filePath: String
+    serializers: SerializersModule,
+    configuration: Queue.Configuration?,
+    settings: Settings
 ) {
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
-    private val format = Json { serializersModule = module.plus(serializers) }
     private val module = SerializersModule {
         contextual(UUIDSerializer)
         contextual(InstantIso8601Serializer)
@@ -33,18 +32,15 @@ abstract class AbstractJobScheduler(
             subclass(PersistenceRule::class, PersistenceRule.serializer())
         }
     }
+    private val format = Json { serializersModule = module + serializers }
 
     @PublishedApi
     internal val delegate = JobDelegate()
 
     @PublishedApi
     internal val queue = JobQueue(
-        storeOf(
-            filePath = "${filePath}/jobs",
-            default = null,
-            enableCache = true,
-            serializer = format
-        ),
+        settings,
+        format,
         configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1)
     )
 

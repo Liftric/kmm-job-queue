@@ -1,14 +1,14 @@
 package com.liftric.persisted.queue
 
+import com.russhwolf.settings.NSUserDefaultsSettings
 import kotlinx.serialization.modules.SerializersModule
-import platform.Foundation.NSHomeDirectory
+import platform.Foundation.NSUserDefaults
 
 actual class JobScheduler(
     serializers: SerializersModule = SerializersModule {},
-    configuration: Queue.Configuration? = null,
-    filePath: String = NSHomeDirectory()
+    configuration: Queue.Configuration? = null
 ) : AbstractJobScheduler(
     serializers,
     configuration,
-    filePath
+    NSUserDefaultsSettings(NSUserDefaults("com.liftric.persisted.queue"))
 )
