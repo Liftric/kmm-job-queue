@@ -12,7 +12,9 @@ import kotlin.reflect.KClass
 
 actual typealias UUID = NSUUID
 
-actual fun KClass<UUID>.instance(): UUID = NSUUID()
+internal actual object UUIDFactory {
+    actual fun create(): UUID = NSUUID()
+}
 
 actual object UUIDSerializer: KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)

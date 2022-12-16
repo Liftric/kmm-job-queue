@@ -21,7 +21,6 @@ abstract class AbstractJobScheduler(
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
     private val module = SerializersModule {
-        contextual(UUIDSerializer)
         contextual(InstantIso8601Serializer)
         polymorphic(JobRule::class) {
             subclass(DelayRule::class, DelayRule.serializer())
@@ -45,7 +44,7 @@ abstract class AbstractJobScheduler(
     )
 
     init {
-        delegate.onExit = { /* Do something */ }
+        delegate.onExit = { settings.remove(it.id.toString()) }
         delegate.onRepeat = { repeat(it) }
         delegate.onEvent = { onEvent.emit(it) }
     }

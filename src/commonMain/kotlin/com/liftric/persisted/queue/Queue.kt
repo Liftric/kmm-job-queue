@@ -53,7 +53,7 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
     }
 
     suspend fun start() {
-        while (configuration.scope.isActive) {
+        while (coroutineContext.isActive) {
             if (queue.value.isEmpty()) break
             if (isCancelling.isLocked) break
             if (lock.availablePermits < 1) break
@@ -65,9 +65,11 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
                     if (job.info.shouldPersist) {
                         settings[job.id.toString()] = format.encodeToString(job)
                     }
-                    withTimeout(job.info.timeout) {
-                        queue.value.remove(job)
-                        settings.remove(job.id.toString())
+                    withContext(configuration.scope.coroutineContext) {
+                        withTimeout(job.info.timeout) {
+                            queue.value.remove(job)
+                            job.run()
+                        }
                     }
                 }
             }
@@ -77,8 +79,8 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
     suspend fun cancel() {
         submitCancellation(coroutineContext) {
             isCancelling.withLock {
-                configuration.scope.coroutineContext.cancelChildren()
                 queue.value.clear()
+                configuration.scope.coroutineContext.cancelChildren()
                 settings.clear()
             }
         }

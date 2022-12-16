@@ -13,7 +13,7 @@ abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
     }
     @Test
     fun testSchedule() = runBlocking {
-        val id = UUID::class.instance().toString()
+        val id = UUIDFactory.create().toString()
         val job = async {
             scheduler.onEvent.collect {
                 println(it)
