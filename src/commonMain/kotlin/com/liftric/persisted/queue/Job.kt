@@ -54,6 +54,8 @@ data class Job<Data>(
                     delegate?.broadcast(JobEvent.DidCancel(this@Job, "Cancelled after run"))
                 } catch (e: Error) {
                     delegate?.broadcast(JobEvent.DidFailOnRemove(this@Job, e))
+                } finally {
+                    delegate?.exit(this@Job)
                 }
             }
         }
@@ -65,7 +67,7 @@ data class Job<Data>(
         cancellable?.cancel(CancellationException("Cancelled during run")) ?: run {
             delegate?.broadcast(JobEvent.DidCancel(this@Job, "Cancelled before run"))
         }
-        delegate?.exit()
+        delegate?.exit(this@Job)
     }
 
     override suspend fun repeat(id: UUID, info: JobInfo, task: DataTask<*>, startTime: Instant) {

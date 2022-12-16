@@ -2,19 +2,17 @@ package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
 import kotlinx.coroutines.*
-import kotlinx.serialization.modules.SerializersModule
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.serialization.modules.polymorphic
 
-class JobSchedulerTests {
+expect class JobSchedulerTests: AbstractJobSchedulerTests
+abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
+    @AfterTest
+    fun tearDown() = runBlocking {
+        scheduler.queue.cancel()
+    }
     @Test
     fun testSchedule() = runBlocking {
-        val scheduler = JobScheduler(serializers = SerializersModule {
-            polymorphic(DataTask::class) {
-                subclass(TestTask::class, TestTask.serializer())
-            }
-        })
         val id = UUID::class.instance().toString()
         val job = async {
             scheduler.onEvent.collect {
@@ -44,8 +42,6 @@ class JobSchedulerTests {
 
     @Test
     fun testRetry() = runBlocking {
-        val scheduler = JobScheduler()
-
         var count = 0
         val job = launch {
             scheduler.onEvent.collect {
@@ -68,8 +64,6 @@ class JobSchedulerTests {
 
     @Test
     fun testCancelDuringRun() {
-        val scheduler = JobScheduler()
-
         runBlocking {
             scheduler.schedule(LongRunningTask()) {
                 delay(10.seconds)
@@ -95,8 +89,6 @@ class JobSchedulerTests {
 
     @Test
     fun testCancelByIdBeforeEnqueue() {
-        val scheduler = JobScheduler()
-
         runBlocking {
             val completable = CompletableDeferred<UUID>()
 
@@ -126,8 +118,6 @@ class JobSchedulerTests {
 
     @Test
     fun testCancelByIdAfterEnqueue() {
-        val scheduler = JobScheduler()
-
         runBlocking {
             launch {
                 scheduler.onEvent.collect {

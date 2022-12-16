@@ -1,26 +1,27 @@
 package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
+import io.github.xxfast.kstore.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.datetime.serializers.InstantIso8601Serializer
-import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
 import kotlinx.serialization.modules.plus
 import kotlinx.serialization.modules.polymorphic
-import kotlin.reflect.KClass
 
-class JobScheduler(
+expect class JobScheduler: AbstractJobScheduler
+abstract class AbstractJobScheduler(
     serializers: SerializersModule = SerializersModule {},
-    configuration: Queue.Configuration? = null
+    configuration: Queue.Configuration? = null,
+    filePath: String
 ) {
-    val queue = JobQueue(configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1))
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
-     private val module = SerializersModule {
+    private val format = Json { serializersModule = module.plus(serializers) }
+    private val module = SerializersModule {
         contextual(UUIDSerializer)
         contextual(InstantIso8601Serializer)
         polymorphic(JobRule::class) {
@@ -31,12 +32,21 @@ class JobScheduler(
             subclass(UniqueRule::class, UniqueRule.serializer())
             subclass(PersistenceRule::class, PersistenceRule.serializer())
         }
-     }
-
-    val format = Json { serializersModule = module.plus(serializers) }
+    }
 
     @PublishedApi
     internal val delegate = JobDelegate()
+
+    @PublishedApi
+    internal val queue = JobQueue(
+        storeOf(
+            filePath = "${filePath}/jobs",
+            default = null,
+            enableCache = true,
+            serializer = format
+        ),
+        configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1)
+    )
 
     init {
         delegate.onExit = { /* Do something */ }
@@ -60,10 +70,6 @@ class JobScheduler(
         val job = Job(task, info)
         job.delegate = delegate
 
-        if (Data::class.simpleName != "Unit") {
-            println(format.encodeToString(job))
-        }
-
         job.info.rules.forEach {
             it.willSchedule(queue, job)
         }
@@ -82,9 +88,9 @@ class JobScheduler(
             it.willSchedule(queue, job)
         }
 
-        onEvent.emit(JobEvent.DidScheduleRepeat(job))
-
-        queue.add(job)
+        queue.add(job).apply {
+            onEvent.emit(JobEvent.DidScheduleRepeat(job))
+        }
     } catch (error: Error) {
         onEvent.emit(JobEvent.DidThrowOnRepeat(error))
     }
