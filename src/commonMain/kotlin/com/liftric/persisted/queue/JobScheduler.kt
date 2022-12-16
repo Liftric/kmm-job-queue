@@ -11,6 +11,7 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
 import kotlinx.serialization.modules.plus
 import kotlinx.serialization.modules.polymorphic
+import kotlin.reflect.KClass
 
 class JobScheduler(
     serializers: SerializersModule = SerializersModule {},
@@ -59,7 +60,9 @@ class JobScheduler(
         val job = Job(task, info)
         job.delegate = delegate
 
-        println(format.encodeToString(job))
+        if (Data::class.simpleName != "Unit") {
+            println(format.encodeToString(job))
+        }
 
         job.info.rules.forEach {
             it.willSchedule(queue, job)
