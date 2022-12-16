@@ -3,12 +3,13 @@ package com.liftric.persisted.queue
 import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
 @Serializable
 data class Job(
-    override val id: UUID,
+    @Contextual override val id: UUID,
     override val info: JobInfo,
     override val task: Task,
     override val startTime: Instant

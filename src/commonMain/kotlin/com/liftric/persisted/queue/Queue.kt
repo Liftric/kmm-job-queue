@@ -13,11 +13,9 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.serializer
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
-import kotlin.reflect.typeOf
 
 interface Queue {
     val jobs: List<JobContext>
@@ -51,8 +49,6 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
     internal fun add(job: Job) {
         queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
         if (job.info.shouldPersist) {
-            val json = format.encodeToString(job)
-            println(json)
             settings[job.id.toString()] = format.encodeToString(job)
         }
     }
@@ -79,8 +75,8 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
     }
 
     internal suspend fun restoreJobs() {
-        settings.keys.forEach { json ->
-            add(format.decodeFromString(serializer(), json))
+        settings.keys.forEach { key ->
+            add(format.decodeFromString(settings.getString(key, "")))
         }
     }
 
