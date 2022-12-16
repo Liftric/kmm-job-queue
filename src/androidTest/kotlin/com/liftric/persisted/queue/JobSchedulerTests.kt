@@ -8,12 +8,14 @@ import kotlinx.serialization.modules.polymorphic
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-actual class JobSchedulerTests: AbstractJobSchedulerTests(JobScheduler(
-    context = InstrumentationRegistry.getInstrumentation().targetContext,
-    serializers = SerializersModule {
-        polymorphic(DataTask::class) {
-            subclass(TestTask::class, TestTask.serializer())
-        }
-    },
-    settings = MapSettings()
-))
+actual class JobSchedulerTests: AbstractJobSchedulerTests({
+    JobScheduler(
+        context = InstrumentationRegistry.getInstrumentation().targetContext,
+        serializers = SerializersModule {
+            polymorphic(Task::class) {
+                subclass(TestTask::class, TestTask.serializer())
+            }
+        },
+        settings = MapSettings()
+    )
+})

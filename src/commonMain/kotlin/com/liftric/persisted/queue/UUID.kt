@@ -1,7 +1,6 @@
 package com.liftric.persisted.queue
 
 import kotlinx.serialization.KSerializer
-import kotlin.reflect.KClass
 
 expect class UUID
 

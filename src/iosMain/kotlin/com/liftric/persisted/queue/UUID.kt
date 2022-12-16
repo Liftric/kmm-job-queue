@@ -1,6 +1,8 @@
 package com.liftric.persisted.queue
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -16,6 +18,7 @@ internal actual object UUIDFactory {
     actual fun create(): UUID = NSUUID()
 }
 
+@Serializer(forClass = UUID::class)
 actual object UUIDSerializer: KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)
 

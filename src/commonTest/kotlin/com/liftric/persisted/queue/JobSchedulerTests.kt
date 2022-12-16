@@ -6,7 +6,9 @@ import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
 expect class JobSchedulerTests: AbstractJobSchedulerTests
-abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
+abstract class AbstractJobSchedulerTests(private val factory: () -> JobScheduler) {
+    private val scheduler = factory()
+
     @AfterTest
     fun tearDown() = runBlocking {
         scheduler.queue.cancel()
@@ -138,5 +140,22 @@ abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
                 delay(10.seconds)
             }
         }
+    }
+
+    @Test
+    fun testPersist() = runBlocking {
+        scheduler.schedule(TestData(UUIDFactory.create().toString()), ::TestTask) {
+            persist()
+        }
+
+        assertEquals(1, scheduler.queue.jobs.count())
+
+        scheduler.queue.clearJobs()
+
+        assertEquals(0, scheduler.queue.jobs.count())
+
+        scheduler.queue.restoreJobs()
+
+        assertEquals(1, scheduler.queue.jobs.count())
     }
 }

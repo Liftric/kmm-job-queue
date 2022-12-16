@@ -13,12 +13,12 @@ data class TestTask(override val data: TestData): DataTask<TestData> {
 }
 
 @Serializable
-class TestErrorTask: Task() {
+class TestErrorTask: Task {
     override suspend fun body() {  throw Error("Oh shoot!") }
     override suspend fun onRepeat(cause: Throwable): Boolean = cause is Error
 }
 
 @Serializable
-class LongRunningTask: Task() {
+class LongRunningTask: Task {
     override suspend fun body() { delay(10.seconds) }
 }

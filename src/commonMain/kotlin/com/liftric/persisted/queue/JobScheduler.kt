@@ -21,6 +21,7 @@ abstract class AbstractJobScheduler(
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
     private val module = SerializersModule {
+        contextual(UUIDSerializer)
         contextual(InstantIso8601Serializer)
         polymorphic(JobRule::class) {
             subclass(DelayRule::class, DelayRule.serializer())
@@ -49,15 +50,15 @@ abstract class AbstractJobScheduler(
         delegate.onEvent = { onEvent.emit(it) }
     }
 
-    suspend fun schedule(task: () -> DataTask<Unit>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+    suspend fun schedule(task: () -> Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
         schedule(task(), configure)
     }
 
-    suspend inline fun <reified Data> schedule(data: Data, task: (Data) -> DataTask<Data>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+    suspend fun <Data> schedule(data: Data, task: (Data) -> DataTask<Data>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
         schedule(task(data), configure)
     }
 
-    suspend inline fun <reified Data> schedule(task: DataTask<Data>, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
+    suspend fun schedule(task: Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
         val info = configure(JobInfo()).apply {
             rules.forEach { it.mutating(this) }
         }
@@ -76,7 +77,7 @@ abstract class AbstractJobScheduler(
         onEvent.emit(JobEvent.DidThrowOnSchedule(error))
     }
 
-    private suspend fun repeat(job: Job<*>) = try {
+    private suspend fun repeat(job: Job) = try {
         job.delegate = delegate
 
         job.info.rules.forEach {

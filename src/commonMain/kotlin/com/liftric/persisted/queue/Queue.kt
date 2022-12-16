@@ -13,9 +13,11 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
+import kotlin.reflect.typeOf
 
 interface Queue {
     val jobs: List<JobContext>
@@ -29,7 +31,7 @@ interface Queue {
 
 class JobQueue(private val settings: Settings, private val format: Json, override val configuration: Queue.Configuration): Queue {
     private val cancellationQueue = MutableSharedFlow<kotlinx.coroutines.Job>(extraBufferCapacity = Int.MAX_VALUE)
-    private val queue = atomic(mutableListOf<Job<*>>())
+    private val queue = atomic(mutableListOf<Job>())
     private val lock = Semaphore(configuration.maxConcurrency, 0)
     private val isCancelling = Mutex(false)
     override val jobs: List<JobContext>
@@ -41,15 +43,18 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
             .launchIn(configuration.scope)
 
         configuration.scope.launch {
-            settings.keys.forEach { json ->
-                add(format.decodeFromString(json))
-            }
+            restoreJobs()
         }
     }
 
     @PublishedApi
-    internal fun add(job: Job<*>) {
+    internal fun add(job: Job) {
         queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
+        if (job.info.shouldPersist) {
+            val json = format.encodeToString(job)
+            println(json)
+            settings[job.id.toString()] = format.encodeToString(job)
+        }
     }
 
     suspend fun start() {
@@ -62,9 +67,6 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
                 queue.value.remove(job)
             } else if (job.startTime <= Clock.System.now()) {
                 lock.withPermit {
-                    if (job.info.shouldPersist) {
-                        settings[job.id.toString()] = format.encodeToString(job)
-                    }
                     withContext(configuration.scope.coroutineContext) {
                         withTimeout(job.info.timeout) {
                             job.run()
@@ -74,6 +76,16 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
                 }
             }
         }
+    }
+
+    internal suspend fun restoreJobs() {
+        settings.keys.forEach { json ->
+            add(format.decodeFromString(serializer(), json))
+        }
+    }
+
+    internal suspend fun clearJobs() {
+        queue.value.clear()
     }
 
     suspend fun cancel() {
