@@ -2,6 +2,7 @@ package com.liftric.persisted.queue
 
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 data class TestData(val testResultId: String)
@@ -19,5 +20,5 @@ class TestErrorTask: Task() {
 
 @Serializable
 class LongRunningTask: Task() {
-    override suspend fun body() { delay(10000L) }
+    override suspend fun body() { delay(10.seconds) }
 }

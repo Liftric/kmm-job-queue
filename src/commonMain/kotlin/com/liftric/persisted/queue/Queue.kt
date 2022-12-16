@@ -67,8 +67,8 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
                     }
                     withContext(configuration.scope.coroutineContext) {
                         withTimeout(job.info.timeout) {
-                            queue.value.remove(job)
                             job.run()
+                            queue.value.remove(job)
                         }
                     }
                 }

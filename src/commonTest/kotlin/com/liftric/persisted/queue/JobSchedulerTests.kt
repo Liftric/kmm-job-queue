@@ -65,9 +65,7 @@ abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
     @Test
     fun testCancelDuringRun() {
         runBlocking {
-            scheduler.schedule(LongRunningTask()) {
-                delay(10.seconds)
-            }
+            scheduler.schedule(::LongRunningTask)
 
             launch {
                 scheduler.onEvent.collect {
