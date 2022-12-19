@@ -6,11 +6,10 @@ import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
 expect class JobSchedulerTests: AbstractJobSchedulerTests
-abstract class AbstractJobSchedulerTests(private val factory: () -> JobScheduler) {
-    private val scheduler = factory()
-
+abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
     @AfterTest
     fun tearDown() = runBlocking {
+        scheduler.queue.stop()
         scheduler.queue.clear()
     }
 
@@ -151,7 +150,7 @@ abstract class AbstractJobSchedulerTests(private val factory: () -> JobScheduler
 
         assertEquals(1, scheduler.queue.jobs.count())
 
-        scheduler.queue.clear()
+        scheduler.queue.clear(clearStore = false)
 
         assertEquals(0, scheduler.queue.jobs.count())
 

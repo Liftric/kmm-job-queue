@@ -8,9 +8,9 @@ import platform.Foundation.NSUserDefaults
 actual class JobScheduler(
     serializers: SerializersModule = SerializersModule {},
     configuration: Queue.Configuration? = null,
-    settings: Settings = NSUserDefaultsSettings(NSUserDefaults("com.liftric.persisted.queue"))
+    store: JsonStorage = SettingsStorage(NSUserDefaultsSettings(NSUserDefaults("com.liftric.persisted.queue")))
 ) : AbstractJobScheduler(
     serializers,
     configuration,
-    settings
+    store
 )

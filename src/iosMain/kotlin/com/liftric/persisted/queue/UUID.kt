@@ -11,6 +11,7 @@ actual typealias UUID = NSUUID
 
 internal actual object UUIDFactory {
     actual fun create(): UUID = NSUUID()
+    actual fun fromString(string: String): UUID = UUID(string)
 }
 
 actual object UUIDSerializer: KSerializer<UUID> {

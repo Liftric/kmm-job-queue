@@ -5,12 +5,12 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import java.util.UUID
 
-actual typealias UUID = UUID
+actual typealias UUID = java.util.UUID
 
 internal actual object UUIDFactory {
     actual fun create(): UUID = UUID.randomUUID()
+    actual fun fromString(string: String): UUID = UUID.fromString(string)
 }
 
 actual object UUIDSerializer: KSerializer<UUID> {

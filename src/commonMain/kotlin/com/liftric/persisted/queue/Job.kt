@@ -6,6 +6,7 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlin.coroutines.coroutineContext
 
 @Serializable
 data class Job(
@@ -26,8 +27,8 @@ data class Job(
     private var canRepeat: Boolean = false
 
     internal suspend fun run() {
-        coroutineScope {
-            if (isCancelled) return@coroutineScope
+        withContext(coroutineContext) {
+            if (isCancelled) return@withContext
             cancellable = launch {
                 val event = try {
                     info.rules.forEach { it.willRun(this@Job) }
@@ -39,7 +40,7 @@ data class Job(
                     JobEvent.DidEnd(this@Job)
                 } catch (e: CancellationException) {
                     JobEvent.DidCancel(this@Job, "Cancelled during run")
-                } catch (e: Error) {
+                } catch (e: Throwable) {
                     canRepeat = task.onRepeat(e)
                     JobEvent.DidFail(this@Job, e)
                 }
@@ -52,7 +53,7 @@ data class Job(
                     info.rules.forEach { it.willRemove(this@Job, event) }
                 } catch (e: CancellationException) {
                     delegate?.broadcast(JobEvent.DidCancel(this@Job, "Cancelled after run"))
-                } catch (e: Error) {
+                } catch (e: Throwable) {
                     delegate?.broadcast(JobEvent.DidFailOnRemove(this@Job, e))
                 } finally {
                     delegate?.exit(this@Job)

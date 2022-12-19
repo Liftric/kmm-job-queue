@@ -4,12 +4,12 @@ sealed class JobEvent {
     data class DidSchedule(val job: JobContext): JobEvent()
     data class DidScheduleRepeat(val job: JobContext): JobEvent()
     data class WillRun(val job: JobContext): JobEvent()
-    data class DidThrowOnRepeat(val error: Error): JobEvent()
-    data class DidThrowOnSchedule(val error: Error): JobEvent()
+    data class DidThrowOnRepeat(val error: Throwable): JobEvent()
+    data class DidThrowOnSchedule(val error: Throwable): JobEvent()
     data class DidEnd(val job: JobContext): JobEvent()
-    data class DidFail(val job: JobContext, val error: Error): JobEvent()
+    data class DidFail(val job: JobContext, val error: Throwable): JobEvent()
     data class DidCancel(val job: JobContext, val message: String): JobEvent()
-    data class DidFailOnRemove(val job: JobContext, val error: Error): JobEvent()
+    data class DidFailOnRemove(val job: JobContext, val error: Throwable): JobEvent()
     data class NotAllowedToRepeat(val job: JobContext): JobEvent()
 }
 

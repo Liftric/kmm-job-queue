@@ -1,8 +1,6 @@
 package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
-import com.russhwolf.settings.Settings
-import com.russhwolf.settings.set
 import kotlinx.coroutines.flow.*
 import kotlinx.datetime.serializers.InstantIso8601Serializer
 import kotlinx.serialization.encodeToString
@@ -16,7 +14,7 @@ expect class JobScheduler: AbstractJobScheduler
 abstract class AbstractJobScheduler(
     serializers: SerializersModule,
     configuration: Queue.Configuration?,
-    private val settings: Settings
+    private val store: JsonStorage
 ) {
     private val delegate = JobDelegate()
     private val module = SerializersModule {
@@ -35,7 +33,7 @@ abstract class AbstractJobScheduler(
 
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
     val queue = JobQueue(
-        settings = settings,
+        store = store,
         format = format,
         configuration = configuration ?: Queue.DefaultConfiguration,
         onRestore = { job ->
@@ -46,7 +44,7 @@ abstract class AbstractJobScheduler(
     init {
         delegate.onExit = { job ->
             if (job.info.shouldPersist) {
-                settings.remove(job.id.toString())
+                store.remove(job.id.toString())
             }
         }
         delegate.onRepeat = { job ->
@@ -87,7 +85,7 @@ abstract class AbstractJobScheduler(
         }
 
         if (job.info.shouldPersist) {
-            settings[job.id.toString()] = format.encodeToString(job)
+            store.set(job.id.toString(), format.encodeToString(job))
         }
 
         queue.add(job)
@@ -96,9 +94,17 @@ abstract class AbstractJobScheduler(
     private suspend fun repeat(job: Job) = try {
         job.delegate = delegate
 
-        schedule(job).apply {
-            onEvent.emit(JobEvent.DidScheduleRepeat(job))
+        job.info.rules.forEach {
+            it.willSchedule(queue, job)
         }
+
+        if (job.info.shouldPersist) {
+            store.set(job.id.toString(), format.encodeToString(job))
+        }
+
+        onEvent.emit(JobEvent.DidScheduleRepeat(job))
+
+        queue.add(job)
     } catch (error: Error) {
         onEvent.emit(JobEvent.DidThrowOnRepeat(error))
     }

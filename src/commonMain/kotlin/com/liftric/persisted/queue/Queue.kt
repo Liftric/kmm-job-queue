@@ -1,6 +1,5 @@
 package com.liftric.persisted.queue
 
-import com.russhwolf.settings.Settings
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -11,12 +10,15 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.datetime.Clock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.ZERO
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 interface Queue {
     val jobs: List<JobContext>
+    val runningJobs: List<JobContext>
     val configuration: Configuration
 
     data class Configuration(
@@ -33,48 +35,38 @@ interface Queue {
 }
 
 class JobQueue(
-    private val settings: Settings,
+    private val store: JsonStorage,
     private val format: Json,
     override val configuration: Queue.Configuration,
     private val onRestore: (Job) -> Unit
 ): Queue {
-    private val cancellationQueue = MutableSharedFlow<kotlinx.coroutines.Job>(extraBufferCapacity = Int.MAX_VALUE)
-    private val queue = atomic(mutableListOf<Job>())
+    private val enqueuedJobs = atomic(mutableListOf<Job>())
+    private val dequeuedJobs = atomic(mutableListOf<Job>())
     private val lock = Semaphore(configuration.maxConcurrency, 0)
-    private val isCancelling = Mutex(false)
-    override val jobs: List<JobContext>
-        get() = queue.value
-    private var isRunning: Boolean = false
     private var cancellable: kotlinx.coroutines.Job? = null
 
-    init {
-        cancellationQueue.onEach { it.join() }
-            .flowOn(Dispatchers.Default)
-            .launchIn(configuration.scope)
-    }
+    override val jobs: List<JobContext>
+        get() = enqueuedJobs.value
+    override val runningJobs: List<JobContext>
+        get() = dequeuedJobs.value
 
-    internal fun add(job: Job) {
-        queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
+    init {
+        restore()
     }
 
     fun start() {
-        if (isRunning) return else isRunning = true
-        restore()
-        cancellable = CoroutineScope(Dispatchers.Default).launch {
-            while (coroutineContext.isActive) {
-                if (queue.value.isEmpty()) break
-                if (isCancelling.isLocked) break
-                if (lock.availablePermits < 1) break
-                val job = queue.value.first()
-                if (job.isCancelled) {
-                    queue.value.remove(job)
-                } else if (job.startTime <= Clock.System.now()) {
-                    lock.withPermit {
-                        configuration.scope.launch {
-                            withTimeout(job.info.timeout) {
-                                job.run()
-                                queue.value.remove(job)
-                            }
+        cancellable = CoroutineScope(Dispatchers.Default).launchPeriodicAsync(1.seconds) {
+            if (enqueuedJobs.value.isEmpty()) return@launchPeriodicAsync
+            if (lock.availablePermits < 1) return@launchPeriodicAsync
+            val job = enqueuedJobs.value.removeFirst()
+            dequeuedJobs.value.add(job)
+            if (job.isCancelled) return@launchPeriodicAsync
+            if (job.startTime <= Clock.System.now()) {
+                lock.withPermit {
+                    configuration.scope.launch {
+                        withTimeout(job.info.timeout) {
+                            job.run()
+                            dequeuedJobs.value.remove(job)
                         }
                     }
                 }
@@ -83,55 +75,62 @@ class JobQueue(
     }
 
     fun stop() {
-        if (isRunning) isRunning = false else return
         cancellable?.cancel()
+        cancellable = null
     }
 
-    suspend fun clear() {
-        submitCancellation(coroutineContext) {
-            isCancelling.withLock {
-                queue.value.clear()
-                configuration.scope.coroutineContext.cancelChildren()
-                settings.clear()
-            }
+    fun clear(cancelJobs: Boolean = true, clearStore: Boolean = true) {
+        enqueuedJobs.value.clear()
+        if (cancelJobs) {
+            dequeuedJobs.value.clear()
+            configuration.scope.coroutineContext.cancelChildren()
+        }
+        if (clearStore) {
+            store.clear()
         }
     }
 
     suspend fun cancel(id: UUID) {
-        submitCancellation(coroutineContext) {
-            isCancelling.withLock {
-                queue.value.firstOrNull { it.id == id }?.let { job ->
-                    job.cancel()
-                    queue.value.remove(job)
-                }
-            }
+        enqueuedJobs.value.firstOrNull { it.id == id }?.let { job ->
+            job.cancel()
+            enqueuedJobs.value.remove(job)
+        } ?: dequeuedJobs.value.firstOrNull { it.id == id }?.let { job ->
+            job.cancel()
+            dequeuedJobs.value.remove(job)
         }
     }
 
     suspend fun cancel(tag: String) {
-        submitCancellation(coroutineContext) {
-            isCancelling.withLock {
-                queue.value.firstOrNull { it.info.tag == tag }?.let { job ->
-                    job.cancel()
-                    queue.value.remove(job)
-                }
+        enqueuedJobs.value.firstOrNull { it.info.tag == tag }?.let { job ->
+            job.cancel()
+            enqueuedJobs.value.remove(job)
+        } ?: dequeuedJobs.value.firstOrNull { it.info.tag == tag }?.let { job ->
+            job.cancel()
+            dequeuedJobs.value.remove(job)
+        }
+    }
+
+    internal fun add(job: Job) {
+        enqueuedJobs.value = enqueuedJobs.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
+    }
+
+    internal fun restore() {
+        store.keys.forEach { key ->
+            val job: Job = format.decodeFromString(store.get(key))
+            if (jobs.plus(runningJobs).none { it.id == job.id }) {
+                onRestore(job)
+                add(job)
             }
         }
     }
+}
 
-    private fun restore() {
-        settings.keys.forEach { key ->
-            val job: Job = format.decodeFromString(settings.getString(key, ""))
-            onRestore(job)
-            add(job)
-        }
-    }
-
-    private fun submitCancellation(
-        context: CoroutineContext = EmptyCoroutineContext,
-        block: suspend CoroutineScope.() -> Unit
-    ) {
-        val job = configuration.scope.launch(context, CoroutineStart.LAZY, block)
-        cancellationQueue.tryEmit(job)
+private fun CoroutineScope.launchPeriodicAsync(
+    repeat: Duration,
+    action: suspend () -> Unit
+) = async {
+    while (isActive) {
+        action()
+        delay(repeat)
     }
 }
