@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
+
 plugins {
     id("com.android.library") version libs.versions.android.tools.gradle
     kotlin("multiplatform") version libs.versions.kotlin
@@ -44,6 +46,7 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(kotlin("test-common"))
                 implementation(kotlin("test-annotations-common"))
+                implementation(libs.multiplatform.settings.test)
             }
         }
         val androidMain by getting
@@ -53,6 +56,9 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(kotlin("test-junit"))
                 implementation(libs.androidx.test.core)
+                implementation(libs.androidx.test.runner)
+                implementation(libs.androidx.test.ext)
+
             }
         }
         val iosMain by getting
@@ -85,7 +91,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-
     testOptions {
         unitTests.apply {
             isReturnDefaultValues = true
@@ -156,4 +161,8 @@ signing {
     val signingPassword: String? by project
     useInMemoryPgpKeys(signingKey, signingPassword)
     sign(publishing.publications)
+}
+
+tasks.withType<KotlinNativeSimulatorTest> {
+    deviceId = "iPhone 14"
 }

@@ -6,11 +6,12 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.util.UUID
-import kotlin.reflect.KClass
 
 actual typealias UUID = UUID
 
-actual fun KClass<UUID>.instance(): UUID = UUID.randomUUID()
+internal actual object UUIDFactory {
+    actual fun create(): UUID = UUID.randomUUID()
+}
 
 actual object UUIDSerializer: KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)

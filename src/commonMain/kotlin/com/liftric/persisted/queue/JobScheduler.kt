@@ -1,26 +1,26 @@
 package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
+import com.russhwolf.settings.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.datetime.serializers.InstantIso8601Serializer
-import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
 import kotlinx.serialization.modules.plus
 import kotlinx.serialization.modules.polymorphic
-import kotlin.reflect.KClass
 
-class JobScheduler(
-    serializers: SerializersModule = SerializersModule {},
-    configuration: Queue.Configuration? = null
+expect class JobScheduler: AbstractJobScheduler
+abstract class AbstractJobScheduler(
+    serializers: SerializersModule,
+    configuration: Queue.Configuration?,
+    settings: Settings
 ) {
-    val queue = JobQueue(configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1))
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
-     private val module = SerializersModule {
+    private val module = SerializersModule {
         contextual(UUIDSerializer)
         contextual(InstantIso8601Serializer)
         polymorphic(JobRule::class) {
@@ -31,38 +31,40 @@ class JobScheduler(
             subclass(UniqueRule::class, UniqueRule.serializer())
             subclass(PersistenceRule::class, PersistenceRule.serializer())
         }
-     }
-
-    val format = Json { serializersModule = module.plus(serializers) }
+    }
+    private val format = Json { serializersModule = module + serializers }
 
     @PublishedApi
     internal val delegate = JobDelegate()
 
+    @PublishedApi
+    internal val queue = JobQueue(
+        settings,
+        format,
+        configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1)
+    )
+
     init {
-        delegate.onExit = { /* Do something */ }
+        delegate.onExit = { settings.remove(it.id.toString()) }
         delegate.onRepeat = { repeat(it) }
         delegate.onEvent = { onEvent.emit(it) }
     }
 
-    suspend fun schedule(task: () -> DataTask<Unit>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+    suspend fun schedule(task: () -> Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
         schedule(task(), configure)
     }
 
-    suspend inline fun <reified Data> schedule(data: Data, task: (Data) -> DataTask<Data>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+    suspend fun <Data> schedule(data: Data, task: (Data) -> DataTask<Data>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
         schedule(task(data), configure)
     }
 
-    suspend inline fun <reified Data> schedule(task: DataTask<Data>, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
+    suspend fun schedule(task: Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
         val info = configure(JobInfo()).apply {
             rules.forEach { it.mutating(this) }
         }
 
         val job = Job(task, info)
         job.delegate = delegate
-
-        if (Data::class.simpleName != "Unit") {
-            println(format.encodeToString(job))
-        }
 
         job.info.rules.forEach {
             it.willSchedule(queue, job)
@@ -75,16 +77,16 @@ class JobScheduler(
         onEvent.emit(JobEvent.DidThrowOnSchedule(error))
     }
 
-    private suspend fun repeat(job: Job<*>) = try {
+    private suspend fun repeat(job: Job) = try {
         job.delegate = delegate
 
         job.info.rules.forEach {
             it.willSchedule(queue, job)
         }
 
-        onEvent.emit(JobEvent.DidScheduleRepeat(job))
-
-        queue.add(job)
+        queue.add(job).apply {
+            onEvent.emit(JobEvent.DidScheduleRepeat(job))
+        }
     } catch (error: Error) {
         onEvent.emit(JobEvent.DidThrowOnRepeat(error))
     }

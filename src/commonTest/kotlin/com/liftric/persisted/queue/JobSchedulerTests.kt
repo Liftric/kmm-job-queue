@@ -2,20 +2,20 @@ package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
 import kotlinx.coroutines.*
-import kotlinx.serialization.modules.SerializersModule
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.serialization.modules.polymorphic
 
-class JobSchedulerTests {
+expect class JobSchedulerTests: AbstractJobSchedulerTests
+abstract class AbstractJobSchedulerTests(private val factory: () -> JobScheduler) {
+    private val scheduler = factory()
+
+    @AfterTest
+    fun tearDown() = runBlocking {
+        scheduler.queue.cancel()
+    }
     @Test
     fun testSchedule() = runBlocking {
-        val scheduler = JobScheduler(serializers = SerializersModule {
-            polymorphic(DataTask::class) {
-                subclass(TestTask::class, TestTask.serializer())
-            }
-        })
-        val id = UUID::class.instance().toString()
+        val id = UUIDFactory.create().toString()
         val job = async {
             scheduler.onEvent.collect {
                 println(it)
@@ -44,8 +44,6 @@ class JobSchedulerTests {
 
     @Test
     fun testRetry() = runBlocking {
-        val scheduler = JobScheduler()
-
         var count = 0
         val job = launch {
             scheduler.onEvent.collect {
@@ -68,12 +66,8 @@ class JobSchedulerTests {
 
     @Test
     fun testCancelDuringRun() {
-        val scheduler = JobScheduler()
-
         runBlocking {
-            scheduler.schedule(LongRunningTask()) {
-                delay(10.seconds)
-            }
+            scheduler.schedule(::LongRunningTask)
 
             launch {
                 scheduler.onEvent.collect {
@@ -95,8 +89,6 @@ class JobSchedulerTests {
 
     @Test
     fun testCancelByIdBeforeEnqueue() {
-        val scheduler = JobScheduler()
-
         runBlocking {
             val completable = CompletableDeferred<UUID>()
 
@@ -126,8 +118,6 @@ class JobSchedulerTests {
 
     @Test
     fun testCancelByIdAfterEnqueue() {
-        val scheduler = JobScheduler()
-
         runBlocking {
             launch {
                 scheduler.onEvent.collect {
@@ -150,5 +140,22 @@ class JobSchedulerTests {
                 delay(10.seconds)
             }
         }
+    }
+
+    @Test
+    fun testPersist() = runBlocking {
+        scheduler.schedule(TestData(UUIDFactory.create().toString()), ::TestTask) {
+            persist()
+        }
+
+        assertEquals(1, scheduler.queue.jobs.count())
+
+        scheduler.queue.clearJobs()
+
+        assertEquals(0, scheduler.queue.jobs.count())
+
+        scheduler.queue.restoreJobs()
+
+        assertEquals(1, scheduler.queue.jobs.count())
     }
 }

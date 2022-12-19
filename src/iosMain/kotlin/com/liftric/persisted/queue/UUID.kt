@@ -5,14 +5,13 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import platform.Foundation.NSObjectHashCallBacks
 import platform.Foundation.NSUUID
-import platform.darwin.NSObject
-import kotlin.reflect.KClass
 
 actual typealias UUID = NSUUID
 
-actual fun KClass<UUID>.instance(): UUID = NSUUID()
+internal actual object UUIDFactory {
+    actual fun create(): UUID = NSUUID()
+}
 
 actual object UUIDSerializer: KSerializer<UUID> {
     override val descriptor = PrimitiveSerialDescriptor("UUID", PrimitiveKind.STRING)

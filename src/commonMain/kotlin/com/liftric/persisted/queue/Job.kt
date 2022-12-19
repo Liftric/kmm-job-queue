@@ -8,15 +8,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
 @Serializable
-data class Job<Data>(
+data class Job(
     @Contextual override val id: UUID,
     override val info: JobInfo,
-    override val task: DataTask<Data>,
-    @Contextual override val startTime: Instant
+    override val task: Task,
+    override val startTime: Instant
 ): JobContext {
     @Transient var delegate: JobDelegate? = null
 
-    constructor(task: DataTask<Data>, info: JobInfo) : this (UUID::class.instance(), info, task, Clock.System.now())
+    constructor(task: Task, info: JobInfo) : this (UUIDFactory.create(), info, task, Clock.System.now())
 
     private var cancellable: kotlinx.coroutines.Job? = null
 
@@ -54,6 +54,8 @@ data class Job<Data>(
                     delegate?.broadcast(JobEvent.DidCancel(this@Job, "Cancelled after run"))
                 } catch (e: Error) {
                     delegate?.broadcast(JobEvent.DidFailOnRemove(this@Job, e))
+                } finally {
+                    delegate?.exit(this@Job)
                 }
             }
         }
@@ -65,10 +67,10 @@ data class Job<Data>(
         cancellable?.cancel(CancellationException("Cancelled during run")) ?: run {
             delegate?.broadcast(JobEvent.DidCancel(this@Job, "Cancelled before run"))
         }
-        delegate?.exit()
+        delegate?.exit(this@Job)
     }
 
-    override suspend fun repeat(id: UUID, info: JobInfo, task: DataTask<*>, startTime: Instant) {
+    override suspend fun repeat(id: UUID, info: JobInfo, task: Task, startTime: Instant) {
         if (canRepeat) {
             delegate?.repeat(Job(id, info, task, startTime))
         } else {
