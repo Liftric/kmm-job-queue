@@ -11,8 +11,9 @@ abstract class AbstractJobSchedulerTests(private val factory: () -> JobScheduler
 
     @AfterTest
     fun tearDown() = runBlocking {
-        scheduler.queue.cancel()
+        scheduler.queue.clear()
     }
+
     @Test
     fun testSchedule() = runBlocking {
         val id = UUIDFactory.create().toString()
@@ -150,11 +151,11 @@ abstract class AbstractJobSchedulerTests(private val factory: () -> JobScheduler
 
         assertEquals(1, scheduler.queue.jobs.count())
 
-        scheduler.queue.clearJobs()
+        scheduler.queue.clear()
 
         assertEquals(0, scheduler.queue.jobs.count())
 
-        scheduler.queue.restoreJobs()
+        scheduler.queue.restore()
 
         assertEquals(1, scheduler.queue.jobs.count())
     }

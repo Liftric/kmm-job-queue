@@ -1,7 +1,6 @@
 package com.liftric.persisted.queue
 
 import com.russhwolf.settings.Settings
-import com.russhwolf.settings.set
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -11,7 +10,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.datetime.Clock
 import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -25,48 +23,58 @@ interface Queue {
         val scope: CoroutineScope,
         val maxConcurrency: Int
     )
+
+    companion object Default {
+        val DefaultConfiguration = Configuration(
+            scope = CoroutineScope(Dispatchers.Default),
+            maxConcurrency = 1
+        )
+    }
 }
 
-class JobQueue(private val settings: Settings, private val format: Json, override val configuration: Queue.Configuration): Queue {
+class JobQueue(
+    private val settings: Settings,
+    private val format: Json,
+    override val configuration: Queue.Configuration,
+    private val onRestore: (Job) -> Unit
+): Queue {
     private val cancellationQueue = MutableSharedFlow<kotlinx.coroutines.Job>(extraBufferCapacity = Int.MAX_VALUE)
     private val queue = atomic(mutableListOf<Job>())
     private val lock = Semaphore(configuration.maxConcurrency, 0)
     private val isCancelling = Mutex(false)
     override val jobs: List<JobContext>
         get() = queue.value
+    private var isRunning: Boolean = false
+    private var cancellable: kotlinx.coroutines.Job? = null
 
     init {
         cancellationQueue.onEach { it.join() }
             .flowOn(Dispatchers.Default)
             .launchIn(configuration.scope)
-
-        configuration.scope.launch {
-            restoreJobs()
-        }
     }
 
-    @PublishedApi
     internal fun add(job: Job) {
         queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
-        if (job.info.shouldPersist) {
-            settings[job.id.toString()] = format.encodeToString(job)
-        }
     }
 
-    suspend fun start() {
-        while (coroutineContext.isActive) {
-            if (queue.value.isEmpty()) break
-            if (isCancelling.isLocked) break
-            if (lock.availablePermits < 1) break
-            val job = queue.value.first()
-            if (job.isCancelled) {
-                queue.value.remove(job)
-            } else if (job.startTime <= Clock.System.now()) {
-                lock.withPermit {
-                    withContext(configuration.scope.coroutineContext) {
-                        withTimeout(job.info.timeout) {
-                            job.run()
-                            queue.value.remove(job)
+    fun start() {
+        if (isRunning) return else isRunning = true
+        restore()
+        cancellable = CoroutineScope(Dispatchers.Default).launch {
+            while (coroutineContext.isActive) {
+                if (queue.value.isEmpty()) break
+                if (isCancelling.isLocked) break
+                if (lock.availablePermits < 1) break
+                val job = queue.value.first()
+                if (job.isCancelled) {
+                    queue.value.remove(job)
+                } else if (job.startTime <= Clock.System.now()) {
+                    lock.withPermit {
+                        configuration.scope.launch {
+                            withTimeout(job.info.timeout) {
+                                job.run()
+                                queue.value.remove(job)
+                            }
                         }
                     }
                 }
@@ -74,17 +82,12 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
         }
     }
 
-    internal suspend fun restoreJobs() {
-        settings.keys.forEach { key ->
-            add(format.decodeFromString(settings.getString(key, "")))
-        }
+    fun stop() {
+        if (isRunning) isRunning = false else return
+        cancellable?.cancel()
     }
 
-    internal suspend fun clearJobs() {
-        queue.value.clear()
-    }
-
-    suspend fun cancel() {
+    suspend fun clear() {
         submitCancellation(coroutineContext) {
             isCancelling.withLock {
                 queue.value.clear()
@@ -100,7 +103,6 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
                 queue.value.firstOrNull { it.id == id }?.let { job ->
                     job.cancel()
                     queue.value.remove(job)
-                    settings.remove(job.id.toString())
                 }
             }
         }
@@ -112,9 +114,16 @@ class JobQueue(private val settings: Settings, private val format: Json, overrid
                 queue.value.firstOrNull { it.info.tag == tag }?.let { job ->
                     job.cancel()
                     queue.value.remove(job)
-                    settings.remove(job.id.toString())
                 }
             }
+        }
+    }
+
+    private fun restore() {
+        settings.keys.forEach { key ->
+            val job: Job = format.decodeFromString(settings.getString(key, ""))
+            onRestore(job)
+            add(job)
         }
     }
 

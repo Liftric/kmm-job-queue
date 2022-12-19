@@ -2,10 +2,10 @@ package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
 import com.russhwolf.settings.Settings
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import com.russhwolf.settings.set
 import kotlinx.coroutines.flow.*
 import kotlinx.datetime.serializers.InstantIso8601Serializer
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
@@ -16,10 +16,9 @@ expect class JobScheduler: AbstractJobScheduler
 abstract class AbstractJobScheduler(
     serializers: SerializersModule,
     configuration: Queue.Configuration?,
-    settings: Settings
+    private val settings: Settings
 ) {
-    val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
-
+    private val delegate = JobDelegate()
     private val module = SerializersModule {
         contextual(UUIDSerializer)
         contextual(InstantIso8601Serializer)
@@ -34,20 +33,28 @@ abstract class AbstractJobScheduler(
     }
     private val format = Json { serializersModule = module + serializers }
 
-    @PublishedApi
-    internal val delegate = JobDelegate()
-
-    @PublishedApi
-    internal val queue = JobQueue(
-        settings,
-        format,
-        configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1)
+    val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
+    val queue = JobQueue(
+        settings = settings,
+        format = format,
+        configuration = configuration ?: Queue.DefaultConfiguration,
+        onRestore = { job ->
+            job.delegate = delegate
+        }
     )
 
     init {
-        delegate.onExit = { settings.remove(it.id.toString()) }
-        delegate.onRepeat = { repeat(it) }
-        delegate.onEvent = { onEvent.emit(it) }
+        delegate.onExit = { job ->
+            if (job.info.shouldPersist) {
+                settings.remove(job.id.toString())
+            }
+        }
+        delegate.onRepeat = { job ->
+            repeat(job)
+        }
+        delegate.onEvent = { event ->
+            onEvent.emit(event)
+        }
     }
 
     suspend fun schedule(task: () -> Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
@@ -64,27 +71,32 @@ abstract class AbstractJobScheduler(
         }
 
         val job = Job(task, info)
-        job.delegate = delegate
 
-        job.info.rules.forEach {
-            it.willSchedule(queue, job)
-        }
-
-        queue.add(job).apply {
+        schedule(job).apply {
             onEvent.emit(JobEvent.DidSchedule(job))
         }
     } catch (error: Error) {
         onEvent.emit(JobEvent.DidThrowOnSchedule(error))
     }
 
-    private suspend fun repeat(job: Job) = try {
+    private suspend fun schedule(job: Job) {
         job.delegate = delegate
 
         job.info.rules.forEach {
             it.willSchedule(queue, job)
         }
 
-        queue.add(job).apply {
+        if (job.info.shouldPersist) {
+            settings[job.id.toString()] = format.encodeToString(job)
+        }
+
+        queue.add(job)
+    }
+
+    private suspend fun repeat(job: Job) = try {
+        job.delegate = delegate
+
+        schedule(job).apply {
             onEvent.emit(JobEvent.DidScheduleRepeat(job))
         }
     } catch (error: Error) {
