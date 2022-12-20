@@ -77,6 +77,7 @@ class JobQueue(
      * Starts enqueuing scheduled jobs
      */
     fun start() {
+        if (cancellable != null) return
         cancellable = CoroutineScope(Dispatchers.Default).launchPeriodicAsync(1.seconds) {
             if (enqueuedJobs.value.isEmpty()) return@launchPeriodicAsync
             if (lock.availablePermits < 1) return@launchPeriodicAsync
