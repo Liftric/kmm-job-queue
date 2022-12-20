@@ -1,7 +1,10 @@
 package com.liftric.persisted.queue
 
 import com.liftric.persisted.queue.rules.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import kotlinx.datetime.serializers.InstantIso8601Serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -36,22 +39,31 @@ abstract class AbstractJobScheduler(
         store = store,
         format = format,
         configuration = configuration ?: Queue.DefaultConfiguration,
-        onRestore = { job ->
-            job.delegate = delegate
-        }
+        onRestore = { job -> job.apply { job.delegate = delegate } }
     )
 
     init {
-        delegate.onExit = { job ->
-            if (job.info.shouldPersist) {
-                store.remove(job.id.toString())
+        CoroutineScope(Dispatchers.Default).launch {
+            delegate.onEvent.collect { event ->
+                when (event) {
+                    is JobEvent.DidCancel -> {
+                        if (event.job.info.shouldPersist) {
+                            store.remove(event.job.id.toString())
+                        }
+                        queue.cancel(event.job.id)
+                        onEvent.emit(event)
+                    }
+                    is JobEvent.DidExit -> {
+                        if (event.job.info.shouldPersist) {
+                            store.remove(event.job.id.toString())
+                        }
+                    }
+                    is JobEvent.ShouldRepeat -> {
+                        repeat(event.job)
+                    }
+                    else -> onEvent.emit(event)
+                }
             }
-        }
-        delegate.onRepeat = { job ->
-            repeat(job)
-        }
-        delegate.onEvent = { event ->
-            onEvent.emit(event)
         }
     }
 
@@ -77,6 +89,14 @@ abstract class AbstractJobScheduler(
         onEvent.emit(JobEvent.DidThrowOnSchedule(error))
     }
 
+    private suspend fun repeat(job: Job) = try {
+        schedule(job).apply {
+            onEvent.emit(JobEvent.DidScheduleRepeat(job))
+        }
+    } catch (error: Error) {
+        onEvent.emit(JobEvent.DidThrowOnRepeat(error))
+    }
+
     private suspend fun schedule(job: Job) {
         job.delegate = delegate
 
@@ -89,23 +109,5 @@ abstract class AbstractJobScheduler(
         }
 
         queue.add(job)
-    }
-
-    private suspend fun repeat(job: Job) = try {
-        job.delegate = delegate
-
-        job.info.rules.forEach {
-            it.willSchedule(queue, job)
-        }
-
-        if (job.info.shouldPersist) {
-            store.set(job.id.toString(), format.encodeToString(job))
-        }
-
-        onEvent.emit(JobEvent.DidScheduleRepeat(job))
-
-        queue.add(job)
-    } catch (error: Error) {
-        onEvent.emit(JobEvent.DidThrowOnRepeat(error))
     }
 }

@@ -72,7 +72,7 @@ abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
             launch {
                 scheduler.onEvent.collect {
                     println(it)
-                    if (it is JobEvent.DidEnd || it is JobEvent.DidFail) fail("Continued after run")
+                    if (it is JobEvent.DidSucceed || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.WillRun) {
                         scheduler.queue.cancel(it.job.id)
                     }
@@ -95,7 +95,7 @@ abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
             launch {
                 scheduler.onEvent.collect {
                     println(it)
-                    if (it is JobEvent.DidEnd || it is JobEvent.DidFail) fail("Continued after run")
+                    if (it is JobEvent.DidSucceed || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.DidSchedule) {
                         completable.complete(it.job.id)
                     }
