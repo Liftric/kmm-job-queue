@@ -1,17 +1,19 @@
 package com.liftric.persisted.queue
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.serializerOrNull
 
 class JobScheduler(
-    val factory: TaskFactory,
-    configuration: Queue.Configuration? = null
+    configuration: Queue.Configuration? = null,
+    private val serializer: JobSerializer? = null
 ) {
-    val queue = JobQueue(configuration)
-
-    @PublishedApi
-    internal val delegate = JobDelegate()
-
+    val queue = JobQueue(configuration ?: Queue.Configuration(CoroutineScope(Dispatchers.Default), 1))
     val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
+
+    private val delegate = JobDelegate()
 
     init {
         delegate.onExit = { /* Do something */ }
@@ -19,21 +21,22 @@ class JobScheduler(
         delegate.onEvent = { onEvent.emit(it) }
     }
 
-    suspend inline fun <reified T: Task> schedule() {
-        schedule<T> { this }
+    suspend fun schedule(task: () -> DataTask<*>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+        schedule(task(), configure)
     }
 
-    suspend inline fun <reified T: Task> schedule(init: JobInfo.() -> JobInfo) = try {
-        val info = init(JobInfo()).apply {
+    @OptIn(InternalSerializationApi::class)
+    suspend fun schedule(task: DataTask<*>, configure: JobInfo.() -> JobInfo = { JobInfo() }) = try {
+        val info = configure(JobInfo()).apply {
             rules.forEach { it.mutating(this) }
         }
 
-        val task = factory.create(T::class, info.params)
+        if (task.data!!::class.serializerOrNull() == null) throw Exception("Data must be serializable")
 
         val job = Job(task, info)
         job.delegate = delegate
 
-        job.rules.forEach {
+        job.info.rules.forEach {
             it.willSchedule(queue, job)
         }
 
@@ -47,7 +50,7 @@ class JobScheduler(
     private suspend fun repeat(job: Job) = try {
         job.delegate = delegate
 
-        job.rules.forEach {
+        job.info.rules.forEach {
             it.willSchedule(queue, job)
         }
 

@@ -8,7 +8,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 expect class Preferences: AbstractPreferences
-abstract class AbstractPreferences(private val settings: Settings): JobPersister {
+abstract class AbstractPreferences(private val settings: Settings): JobSerializer {
     override val tag: String = ""
     override fun retrieve(id: String): Job? {
         val jsonString = settings.get<String>(id) ?: return null

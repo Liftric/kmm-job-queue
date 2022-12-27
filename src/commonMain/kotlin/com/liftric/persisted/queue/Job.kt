@@ -3,28 +3,17 @@ package com.liftric.persisted.queue
 import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-import kotlin.reflect.KClass
 import kotlin.time.Duration
 
-@Retention(AnnotationRetention.RUNTIME)
-annotation class RepeatOn(val clazz: KClass<Throwable>)
-
-@Serializable
-data class Job(
-    @Serializable(with = UUIDSerializer::class)
+class Job(
     override val id: UUID,
-    override val timeout: Duration,
-    override val task: Task,
-    override val tag: String?,
-    override val rules: List<JobRule>,
+    override val info: JobInfo,
+    override val task: DataTask<*>,
     override val startTime: Instant = Clock.System.now()
 ): JobContext {
-    @Transient
     var delegate: JobDelegate? = null
 
-    constructor(task: Task, info: JobInfo) : this (UUID::class.instance(), info.timeout, task, info.tag, info.rules)
+    constructor(task: DataTask<*>, info: JobInfo) : this (UUID::class.instance(), info, task)
 
     private var cancellable: kotlinx.coroutines.Job? = null
 
@@ -38,7 +27,7 @@ data class Job(
             if (isCancelled) return@coroutineScope
             cancellable = launch {
                 val event = try {
-                    rules.forEach { it.willRun(this@Job) }
+                    info.rules.forEach { it.willRun(this@Job) }
 
                     delegate?.broadcast(JobEvent.WillRun(this@Job))
 
@@ -57,7 +46,7 @@ data class Job(
 
                     if (isCancelled) return@launch
 
-                    rules.forEach { it.willRemove(this@Job, event) }
+                    info.rules.forEach { it.willRemove(this@Job, event) }
                 } catch (e: CancellationException) {
                     delegate?.broadcast(JobEvent.DidCancel(this@Job, "Cancelled after run"))
                 } catch (e: Error) {
@@ -76,9 +65,9 @@ data class Job(
         delegate?.exit()
     }
 
-    override suspend fun repeat(id: UUID, timeout: Duration, task: Task, tag: String?, rules: List<JobRule>, startTime: Instant) {
+    override suspend fun repeat(id: UUID, info: JobInfo, task: DataTask<*>, startTime: Instant) {
         if (canRepeat) {
-            delegate?.repeat(Job(id, timeout, task, tag, rules, startTime))
+            delegate?.repeat(Job(id, info, task, startTime))
         } else {
             delegate?.broadcast(JobEvent.NotAllowedToRepeat(this@Job))
         }

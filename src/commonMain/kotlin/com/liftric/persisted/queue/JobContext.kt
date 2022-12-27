@@ -1,16 +1,13 @@
 package com.liftric.persisted.queue
 
 import kotlinx.datetime.Instant
-import kotlin.time.Duration
 
 interface JobContext {
     val id: UUID
-    val timeout: Duration
-    val task: Task
-    val tag: String?
-    val rules: List<JobRule>
+    val info: JobInfo
+    val task: DataTask<*>
     val startTime: Instant
     suspend fun cancel()
-    suspend fun repeat(id: UUID = this.id, timeout: Duration = this.timeout, task: Task = this.task, tag: String? = this.tag, rules: List<JobRule> = this.rules, startTime: Instant = this.startTime)
+    suspend fun repeat(id: UUID = this.id, info: JobInfo = this.info, task: DataTask<*> = this.task, startTime: Instant = this.startTime)
     suspend fun broadcast(event: RuleEvent)
 }

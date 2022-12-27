@@ -17,43 +17,40 @@ Coroutine job scheduler inspired by `Android Work Manager` and `android-priority
 
 ## Example
 
-Kotlin/Native doesn't have full reflection capabilities, thus we instantiate the job classes in a custom factory class.
+Define a `DataTask<*>` or a `Task` (`DataTask<Unit>`), customize its body and limit when it should repeat.
+
+⚠️ Make sure the data you pass into the task is serializable.
 
 ```kotlin
-class TestFactory: TaskFactory {
-    override fun <T : Task> create(type: KClass<T>, params: Map<String, Any>): Task = when(type) {
-        TestTask::class -> TestTask(params)
-        else -> throw Exception("Unknown job class!")
-    }
+@Serializable
+data class UploadData(val id: String)
+
+class UploadTask(data: UploadData): DataTask<UploadData>(data) {
+    override suspend fun body() { /* Do something */ }
+    override suspend fun onRepeat(cause: Throwable): Boolean { cause is NetworkException }
 }
 ```
 
-Create a single instance of the scheduler on app start, and then start the queue to enqueue scheduled jobs.
+Create a single instance of the scheduler on app start. To start enqueuing jobs run `queue.start()`.
+
+You can pass a `Queue.Configuration` or a custom `JobSerializer` to the scheduler.
 
 ```kotlin
-val factory = TestFactory()
-val scheduler = JobScheduler(factory)
+val scheduler = JobScheduler()
 scheduler.queue.start()
 ```
 
-On job schedule you can add rules, define a store, and inject parameters.
+You can customize the jobs life cycle during schedule by defining rules.
 
-````kotlin
-val data = ...
-
-scheduler.schedule<UploadTask> {
-    rules {
-        retry(RetryLimit.Limited(3), delay = 30.seconds)
-        unique(data.id)
-        timeout(60.seconds)
-    }
-    persist(Store.Preferences)
-    params(
-        "result" to data.value, 
-        "timestamp" to data.date
-    )
+```kotlin
+val data = UploadData(id = ...)
+        
+scheduler.schedule(UploadTask(data)) {
+    unique(data.id)
+    retry(RetryLimit.Limited(3), delay = 30.seconds)
+    persist()
 }
-````
+```
 
 You can subscribe to life cycle events (e.g. for logging).
 

@@ -14,7 +14,7 @@ data class DelayRule(val duration: Duration = 0.seconds): JobRule() {
     }
 }
 
-fun RuleInfo.delay(duration: Duration = 0.seconds): RuleInfo {
+fun JobInfo.delay(duration: Duration = 0.seconds): JobInfo {
     val rule = DelayRule(duration)
     rules.add(rule)
     return this

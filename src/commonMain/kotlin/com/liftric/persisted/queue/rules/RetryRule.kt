@@ -16,9 +16,9 @@ data class RetryRule(val limit: RetryLimit, val delay: Duration = 0.seconds): Jo
                 }
                 is RetryLimit.Limited -> {
                     if (limit.count > 0) {
-                        val rules = context.rules.minus(this).plus(RetryRule(RetryLimit.Limited((limit.count + 1) - 2), delay))
+                        val rules = context.info.rules.minus(this).plus(RetryRule(RetryLimit.Limited((limit.count + 1) - 2), delay))
                         context.broadcast(RuleEvent.OnRemove(this, "Attempting to retry task=$context"))
-                        context.repeat(rules = rules, startTime = Clock.System.now().plus(delay))
+                        context.repeat(info = context.info.copy(rules = rules.toMutableList()), startTime = Clock.System.now().plus(delay))
                     }
                 }
             }
@@ -32,7 +32,7 @@ sealed class RetryLimit {
     object Unlimited: RetryLimit()
 }
 
-fun RuleInfo.retry(limit: RetryLimit, delay: Duration = 0.seconds): RuleInfo {
+fun JobInfo.retry(limit: RetryLimit, delay: Duration = 0.seconds): JobInfo {
     val rule = RetryRule(limit, delay)
     rules.add(rule)
     return this

@@ -15,7 +15,7 @@ data class PeriodicRule(val interval: Duration = 0.seconds): JobRule() {
     }
 }
 
-fun RuleInfo.repeat(interval: Duration = 0.seconds): RuleInfo {
+fun JobInfo.repeat(interval: Duration = 0.seconds): JobInfo {
     val rule = PeriodicRule(interval)
     rules.add(rule)
     return this
