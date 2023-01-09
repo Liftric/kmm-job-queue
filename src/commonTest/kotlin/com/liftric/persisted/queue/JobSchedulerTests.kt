@@ -54,12 +54,14 @@ abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
             }
         }
 
+        delay(1000L)
+
         scheduler.schedule(TestErrorTask()) {
             retry(RetryLimit.Limited(3), delay = 1.seconds)
         }
 
         scheduler.queue.start()
-        delay(10000L)
+        delay(15000L)
         job.cancel()
         assertEquals(3, count)
     }
