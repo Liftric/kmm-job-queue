@@ -19,6 +19,7 @@ dependencyResolutionManagement {
             version("android-tools-gradle", "7.3.0")
             version("kotlin", "1.8.0")
             library("kotlinx-coroutines", "org.jetbrains.kotlinx", "kotlinx-coroutines-core").version("1.6.4")
+            library("kotlinx-coroutines-test", "org.jetbrains.kotlinx", "kotlinx-coroutines-test").version("1.6.4")
             library("kotlinx-serialization", "org.jetbrains.kotlinx", "kotlinx-serialization-json").version("1.4.1")
             library("kotlinx-atomicfu", "org.jetbrains.kotlinx", "atomicfu").version("0.19.0")
             library("kotlinx-datetime", "org.jetbrains.kotlinx", "kotlinx-datetime").version("0.4.0")

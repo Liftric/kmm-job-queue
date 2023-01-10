@@ -24,36 +24,34 @@ data class Job(
     private var canRepeat: Boolean = false
 
     suspend fun run() {
-        withContext(coroutineContext) {
-            if (isCancelled) return@withContext
-            val event = try {
-                info.rules.forEach { it.willRun(this@Job) }
+        if (isCancelled) return
+        val event = try {
+            info.rules.forEach { it.willRun(this@Job) }
 
-                delegate?.broadcast(JobEvent.WillRun(this@Job))
+            delegate?.broadcast(JobEvent.WillRun(this@Job))
 
-                task.body()
+            task.body()
 
-                JobEvent.DidSucceed(this@Job)
-            } catch (e: CancellationException) {
-                JobEvent.DidCancel(this@Job)
-            } catch (e: Throwable) {
-                canRepeat = task.onRepeat(e)
-                JobEvent.DidFail(this@Job, e)
-            }
+            JobEvent.DidSucceed(this@Job)
+        } catch (e: CancellationException) {
+            JobEvent.DidCancel(this@Job)
+        } catch (e: Throwable) {
+            canRepeat = task.onRepeat(e)
+            JobEvent.DidFail(this@Job, e)
+        }
 
-            try {
-                delegate?.broadcast(event)
+        try {
+            delegate?.broadcast(event)
 
-                if (isCancelled) return@withContext
+            if (isCancelled) return
 
-                info.rules.forEach { it.willRemove(this@Job, event) }
-            } catch (e: CancellationException) {
-                delegate?.broadcast(JobEvent.DidCancel(this@Job))
-            } catch (e: Throwable) {
-                delegate?.broadcast(JobEvent.DidFailOnRemove(this@Job, e))
-            } finally {
-                delegate?.exit(this@Job)
-            }
+            info.rules.forEach { it.willRemove(this@Job, event) }
+        } catch (e: CancellationException) {
+            delegate?.broadcast(JobEvent.DidCancel(this@Job))
+        } catch (e: Throwable) {
+            delegate?.broadcast(JobEvent.DidFailOnRemove(this@Job, e))
+        } finally {
+            delegate?.exit(this@Job)
         }
     }
 
