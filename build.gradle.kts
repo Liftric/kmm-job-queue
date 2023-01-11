@@ -81,7 +81,7 @@ kotlin {
 android {
     compileSdk = 33
 
-    namespace = "com.liftric.persisted.queue"
+    namespace = "com.liftric.job.queue"
 
     defaultConfig {
         minSdk = 21
