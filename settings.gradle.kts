@@ -1,4 +1,4 @@
-rootProject.name = "persisted-queue"
+rootProject.name = "job-queue"
 
 pluginManagement {
     repositories {
