@@ -14,32 +14,35 @@ abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
     }
 
     @Test
-    fun testSchedule() = runBlocking {
-        val id = UUIDFactory.create().toString()
-        val job = async {
-            scheduler.onEvent.collect {
-                println(it)
+    fun testSchedule() {
+        runBlocking {
+            val id = UUIDFactory.create().toString()
+            val job = async {
+                scheduler.onEvent.collect {
+                    println(it)
+                }
             }
+
+            scheduler.schedule(TestData(id), ::TestTask) {
+                delay(1.seconds)
+                unique(id)
+            }
+
+            scheduler.schedule(TestTask(TestData(id))) {
+                unique(id)
+            }
+
+            assertEquals(1, scheduler.queue.jobs.count())
+
+            scheduler.queue.start()
+
+            delay(2000L)
+
+            assertEquals(0, scheduler.queue.jobs.count())
+
+            job.cancel()
+
         }
-
-        scheduler.schedule(TestData(id), ::TestTask) {
-            delay(1.seconds)
-            unique(id)
-        }
-
-        scheduler.schedule(TestTask(TestData(id))) {
-            unique(id)
-        }
-
-        assertEquals(1, scheduler.queue.jobs.count())
-
-        scheduler.queue.start()
-
-        delay(2000L)
-
-        assertEquals(0, scheduler.queue.jobs.count())
-
-        job.cancel()
     }
 
     @Test
@@ -69,8 +72,6 @@ abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
     @Test
     fun testCancelDuringRun() {
         runBlocking {
-            scheduler.schedule(::LongRunningTask)
-
             launch {
                 scheduler.onEvent.collect {
                     println(it)
@@ -86,6 +87,10 @@ abstract class AbstractJobSchedulerTests(private val scheduler: JobScheduler) {
             }
 
             scheduler.queue.start()
+
+            delay(2000L)
+
+            scheduler.schedule(::LongRunningTask)
         }
     }
 

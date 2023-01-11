@@ -87,16 +87,12 @@ class JobQueue(
                     if (scheduledJobs.value.isEmpty()) return@withPermit
                     if (scheduledJobs.value.first().startTime.minus(Clock.System.now()) > 0.seconds) return@withPermit
                     val job = scheduledJobs.value.removeFirst()
-                    if (job.isCancelled) return@withPermit
                     _runningJobs.value.add(job)
                     configuration.scope.launch {
-                        try {
-                            withTimeout(job.info.timeout) {
-                                job.run()
-                            }
-                        } finally {
-                            _runningJobs.value.remove(job)
+                        withTimeout(job.info.timeout) {
+                            job.run()
                         }
+                        _runningJobs.value.remove(job)
                     }
                 }
             }
