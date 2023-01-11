@@ -25,7 +25,6 @@ abstract class AbstractJobQueue(
     private val store: JsonStorage
 ): Queue {
     private val module = SerializersModule {
-        contextual(UUIDSerializer)
         contextual(InstantIso8601Serializer)
         polymorphic(JobRule::class) {
             subclass(DelayRule::class, DelayRule.serializer())
