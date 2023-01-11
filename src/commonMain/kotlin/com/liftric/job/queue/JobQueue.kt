@@ -24,13 +24,6 @@ abstract class AbstractJobQueue(
     final override val configuration: Queue.Configuration,
     private val store: JsonStorage
 ): Queue {
-    val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
-
-    override val jobs: List<JobContext>
-        get() = queue.value
-    override val numberOfJobs: Int
-        get() = queue.value.count()
-
     private val module = SerializersModule {
         contextual(UUIDSerializer)
         contextual(InstantIso8601Serializer)
@@ -45,15 +38,19 @@ abstract class AbstractJobQueue(
     }
     private val format = Json { serializersModule = module + serializers }
 
+    val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
+
     /**
      * Scheduled jobs
      */
+    private val running = atomic(mutableMapOf<UUID, kotlinx.coroutines.Job>())
     private val queue = atomic(mutableListOf<Job>())
 
-    /**
-     * Reference to the running jobs
-     */
-    private val running = atomic(mutableMapOf<String, kotlinx.coroutines.Job>())
+    override val jobs: List<JobContext>
+        get() = queue.value
+
+    override val numberOfJobs: Int
+        get() = queue.value.count()
 
     /**
      * Semaphore to limit concurrency
@@ -138,7 +135,7 @@ abstract class AbstractJobQueue(
                 lock.acquire()
                 val job = queue.value.removeFirst()
                 job.delegate = delegate
-                running.value[job.id.toString()] = configuration.scope.launch {
+                running.value[job.id] = configuration.scope.launch {
                     try {
                         withTimeout(job.info.timeout) {
                             onEvent.emit(JobEvent.WillRun(job))
@@ -151,8 +148,8 @@ abstract class AbstractJobQueue(
                         if (job.info.shouldPersist) {
                             store.remove(job.id.toString())
                         }
-                        running.value[job.id.toString()]?.cancel()
-                        running.value.remove(job.id.toString())
+                        running.value[job.id]?.cancel()
+                        running.value.remove(job.id)
                         lock.release()
                     }
                 }
@@ -193,7 +190,7 @@ abstract class AbstractJobQueue(
             queue.value.firstOrNull { it.id == id }?.let { job ->
                 queue.value.remove(job)
                 onEvent.emit(JobEvent.DidCancel(job))
-            } ?: running.value[id.toString()]?.cancel()
+            } ?: running.value[id]?.cancel()
         }
     }
 
