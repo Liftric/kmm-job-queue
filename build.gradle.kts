@@ -79,13 +79,13 @@ kotlin {
 }
 
 android {
-    compileSdk = 30
+    compileSdk = 33
 
     namespace = "com.liftric.persisted.queue"
 
     defaultConfig {
         minSdk = 21
-        targetSdk = 30
+        targetSdk = 33
         testInstrumentationRunner = "androidx.test.runner"
     }
 
