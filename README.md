@@ -4,6 +4,8 @@ Coroutine job scheduler for Kotlin Multiplatform projects. Run & repeat tasks. R
 
 The library depends on `kotlinx-serialization` for the persistence of the jobs.
 
+⚠️ The project is still work in progress and shouldn't be used in a production project.
+
 ## Rules
 
 - [x] Delay
@@ -16,7 +18,8 @@ The library depends on `kotlinx-serialization` for the persistence of the jobs.
 ## Capabilities
 
 - [x] Cancellation (all, by id)
-- [x] Restore from disk
+- [x] Start & stop scheduling
+- [x] Restore from disk (after start)
 
 ## Example
 

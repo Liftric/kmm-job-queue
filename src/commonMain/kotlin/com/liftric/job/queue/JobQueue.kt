@@ -45,11 +45,10 @@ abstract class AbstractJobQueue(
     private val running = atomic(mutableMapOf<UUID, kotlinx.coroutines.Job>())
     private val queue = atomic(mutableListOf<Job>())
 
-    override val jobs: List<JobContext>
+    override val jobs: List<JobData>
         get() = queue.value
-
     override val numberOfJobs: Int
-        get() = queue.value.count()
+        get() = jobs.count()
 
     /**
      * Semaphore to limit concurrency
@@ -136,11 +135,9 @@ abstract class AbstractJobQueue(
                 job.delegate = delegate
                 running.value[job.id] = configuration.scope.launch {
                     try {
-                        withTimeout(job.info.timeout) {
-                            listener.emit(JobEvent.WillRun(job))
-                            val result = job.run()
-                            listener.emit(result)
-                        }
+                        listener.emit(JobEvent.WillRun(job))
+                        val result = job.run()
+                        listener.emit(result)
                     } catch (e: CancellationException) {
                         listener.emit(JobEvent.DidCancel(job))
                     } finally {

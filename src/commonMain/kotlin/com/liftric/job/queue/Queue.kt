@@ -3,7 +3,7 @@ package com.liftric.job.queue
 import kotlinx.coroutines.*
 
 interface Queue {
-    val jobs: List<JobContext>
+    val jobs: List<JobData>
     val numberOfJobs: Int
     val configuration: Configuration
 
