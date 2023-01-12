@@ -20,5 +20,5 @@ class TestErrorTask: Task {
 
 @Serializable
 class LongRunningTask: Task {
-    override suspend fun body() { delay(10.seconds) }
+    override suspend fun body() { delay(15.seconds) }
 }

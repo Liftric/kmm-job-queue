@@ -72,7 +72,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     @Test
     fun testCancelDuringRun() {
         runBlocking {
-            launch {
+            val listener = launch {
                 queue.listener.collect {
                     println(it)
                     if (it is JobEvent.DidSucceed || it is JobEvent.DidFail) fail("Continued after run")
@@ -81,16 +81,19 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
                     }
                     if (it is JobEvent.DidCancel) {
                         assertTrue(queue.numberOfJobs == 0)
-                        cancel()
                     }
                 }
             }
 
             queue.start()
 
-            delay(2000L)
+            delay(1000L)
 
             queue.schedule(::LongRunningTask)
+
+            delay(10000L)
+
+            listener.cancel()
         }
     }
 
