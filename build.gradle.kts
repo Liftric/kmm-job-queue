@@ -9,21 +9,13 @@ plugins {
     id("signing")
 }
 
-repositories {
-    mavenCentral()
-    google()
-    gradlePluginPortal()
-}
-
-tasks.withType(JavaCompile::class) {
-    options.release.set(11)
+group = "com.liftric"
+version = with(versioning.info) {
+    if (branch == "HEAD" && dirty.not()) tag else full
 }
 
 kotlin {
-    ios {
-        binaries.framework()
-    }
-
+    ios()
     iosSimulatorArm64()
 
     android {
@@ -98,16 +90,21 @@ android {
             isReturnDefaultValues = true
         }
     }
+    publishing {
+        multipleVariants {
+            withSourcesJar()
+            withJavadocJar()
+            allVariants()
+        }
+    }
 }
 
-group = "com.liftric"
-version = with(versioning.info) {
-    if (branch == "HEAD" && dirty.not()) tag else full
-}
-
-afterEvaluate {
-    project.publishing.publications.withType(MavenPublication::class.java).forEach {
-        it.groupId = group.toString()
+tasks {
+    withType<KotlinNativeSimulatorTest> {
+        deviceId = "iPhone 14"
+    }
+    withType(JavaCompile::class) {
+        options.release.set(11)
     }
 }
 
@@ -121,11 +118,11 @@ val javadocJar by tasks.registering(Jar::class) {
 publishing {
     repositories {
         maven {
-            name = "sonatype"
-            setUrl("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
+            name = "GitHubPackages"
+            setUrl("https://maven.pkg.github.com/Liftric/kmm-job-queue")
             credentials {
-                username = ossrhUsername
-                password = ossrhPassword
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
             }
         }
     }
@@ -135,13 +132,13 @@ publishing {
 
         pom {
             name.set(project.name)
-            description.set("Kotlin Multiplatform persisted queue library.")
-            url.set("https://github.com/liftric/cognito-idp")
+            description.set("Persistable coroutine job queue for Kotlin Multiplatform projects.")
+            url.set("https://github.com/Liftric/kmm-job-queue")
 
             licenses {
                 license {
                     name.set("MIT")
-                    url.set("https://github.com/liftric/cognito-idp/blob/master/LICENSE")
+                    url.set("https://github.com/Liftric/kmm-job-queue/blob/master/LICENSE")
                 }
             }
             developers {
@@ -152,9 +149,15 @@ publishing {
                 }
             }
             scm {
-                url.set("https://github.com/liftric/persisted-queue")
+                url.set("https://github.com/Liftric/kmm-job-queue")
             }
         }
+    }
+}
+
+afterEvaluate {
+    project.publishing.publications.withType(MavenPublication::class.java).forEach {
+        it.groupId = group.toString()
     }
 }
 
@@ -163,8 +166,4 @@ signing {
     val signingPassword: String? by project
     useInMemoryPgpKeys(signingKey, signingPassword)
     sign(publishing.publications)
-}
-
-tasks.withType<KotlinNativeSimulatorTest> {
-    deviceId = "iPhone 14"
 }
