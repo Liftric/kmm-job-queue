@@ -18,7 +18,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         runBlocking {
             val id = UUIDFactory.create().toString()
             val job = async {
-                queue.onEvent.collect {
+                queue.listener.collect {
                     println(it)
                 }
             }
@@ -49,7 +49,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     fun testRetry() = runBlocking {
         var count = 0
         val job = launch {
-            queue.onEvent.collect {
+            queue.listener.collect {
                 println(it)
                 if (it is JobEvent.DidScheduleRepeat) {
                     count += 1
@@ -73,7 +73,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     fun testCancelDuringRun() {
         runBlocking {
             launch {
-                queue.onEvent.collect {
+                queue.listener.collect {
                     println(it)
                     if (it is JobEvent.DidSucceed || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.WillRun) {
@@ -100,7 +100,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
             val completable = CompletableDeferred<UUID>()
 
             launch {
-                queue.onEvent.collect {
+                queue.listener.collect {
                     println(it)
                     if (it is JobEvent.DidSucceed || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.DidSchedule) {
@@ -127,7 +127,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     fun testCancelByIdAfterEnqueue() {
         runBlocking {
             launch {
-                queue.onEvent.collect {
+                queue.listener.collect {
                     println(it)
                     if (it is JobEvent.DidSchedule) {
                         delay(3000L)

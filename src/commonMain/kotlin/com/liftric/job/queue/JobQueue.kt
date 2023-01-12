@@ -37,7 +37,7 @@ abstract class AbstractJobQueue(
     }
     private val format = Json { serializersModule = module + serializers }
 
-    val onEvent = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
+    val listener = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
     /**
      * Scheduled jobs
@@ -85,7 +85,7 @@ abstract class AbstractJobQueue(
         val job = Job(task, info)
 
         schedule(job).apply {
-            onEvent.emit(JobEvent.DidSchedule(job))
+            listener.emit(JobEvent.DidSchedule(job))
         }
     }
 
@@ -100,7 +100,7 @@ abstract class AbstractJobQueue(
 
         queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
     } catch (e: Throwable) {
-        onEvent.emit(JobEvent.DidThrowOnSchedule(e))
+        listener.emit(JobEvent.DidThrowOnSchedule(e))
     }
 
     private val delegate = JobDelegate()
@@ -119,10 +119,10 @@ abstract class AbstractJobQueue(
                         }
                         is JobEvent.ShouldRepeat -> {
                             schedule(event.job).apply {
-                                onEvent.emit(JobEvent.DidScheduleRepeat(event.job))
+                                listener.emit(JobEvent.DidScheduleRepeat(event.job))
                             }
                         }
-                        else -> onEvent.emit(event)
+                        else -> listener.emit(event)
                     }
                 }
             }
@@ -137,12 +137,12 @@ abstract class AbstractJobQueue(
                 running.value[job.id] = configuration.scope.launch {
                     try {
                         withTimeout(job.info.timeout) {
-                            onEvent.emit(JobEvent.WillRun(job))
+                            listener.emit(JobEvent.WillRun(job))
                             val result = job.run()
-                            onEvent.emit(result)
+                            listener.emit(result)
                         }
                     } catch (e: CancellationException) {
-                        onEvent.emit(JobEvent.DidCancel(job))
+                        listener.emit(JobEvent.DidCancel(job))
                     } finally {
                         if (job.info.shouldPersist) {
                             store.remove(job.id.toString())
@@ -188,7 +188,7 @@ abstract class AbstractJobQueue(
         isCancelling.withLock {
             queue.value.firstOrNull { it.id == id }?.let { job ->
                 queue.value.remove(job)
-                onEvent.emit(JobEvent.DidCancel(job))
+                listener.emit(JobEvent.DidCancel(job))
             } ?: running.value[id]?.cancel()
         }
     }
