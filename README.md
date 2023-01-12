@@ -1,4 +1,4 @@
-# Persisted-queue
+# kmm-job-queue
 
 Coroutine job scheduler for Kotlin Multiplatform projects. Run & repeat tasks. Rebuild them from disk. Fine tune execution with rules.
 
