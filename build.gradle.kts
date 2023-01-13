@@ -9,7 +9,9 @@ plugins {
 }
 
 group = "com.liftric"
-version = "0.1.0"
+version = with(versioning.info) {
+    if (branch == "HEAD" && dirty.not()) tag else full
+}
 
 kotlin {
     ios()
