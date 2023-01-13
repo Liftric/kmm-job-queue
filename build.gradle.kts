@@ -6,13 +6,10 @@ plugins {
     alias(libs.plugins.versioning)
     alias(libs.plugins.kotlin.serialization)
     id("maven-publish")
-    id("signing")
 }
 
 group = "com.liftric"
-version = with(versioning.info) {
-    if (branch == "HEAD" && dirty.not()) tag else full
-}
+version = "0.1.0"
 
 kotlin {
     ios()
@@ -67,6 +64,10 @@ kotlin {
                 optIn("kotlin.RequiresOptIn")
             }
         }
+    }
+
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of("11"))
     }
 }
 
@@ -159,11 +160,4 @@ afterEvaluate {
     project.publishing.publications.withType(MavenPublication::class.java).forEach {
         it.groupId = group.toString()
     }
-}
-
-signing {
-    val signingKey: String? by project
-    val signingPassword: String? by project
-    useInMemoryPgpKeys(signingKey, signingPassword)
-    sign(publishing.publications)
 }
