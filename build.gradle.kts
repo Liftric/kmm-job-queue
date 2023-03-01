@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.versioning)
     alias(libs.plugins.kotlin.serialization)
     id("maven-publish")
+    id("signing")
 }
 
 group = "com.liftric"
@@ -121,11 +122,11 @@ val javadocJar by tasks.registering(Jar::class) {
 publishing {
     repositories {
         maven {
-            name = "GitHubPackages"
-            setUrl("https://maven.pkg.github.com/Liftric/kmm-job-queue")
+            name = "sonatype"
+            setUrl("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
             credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
+                username = ossrhUsername
+                password = ossrhPassword
             }
         }
     }
@@ -162,4 +163,11 @@ afterEvaluate {
     project.publishing.publications.withType(MavenPublication::class.java).forEach {
         it.groupId = group.toString()
     }
+}
+
+signing {
+    val signingKey: String? by project
+    val signingPassword: String? by project
+    useInMemoryPgpKeys(signingKey, signingPassword)
+    sign(publishing.publications)
 }
