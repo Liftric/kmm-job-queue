@@ -3,7 +3,7 @@ package com.liftric.job.queue
 import com.liftric.job.queue.rules.*
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -18,12 +18,13 @@ import kotlinx.serialization.modules.plus
 import kotlinx.serialization.modules.polymorphic
 import kotlin.time.Duration.Companion.seconds
 
-expect class JobQueue: AbstractJobQueue
+expect class JobQueue : AbstractJobQueue
 abstract class AbstractJobQueue(
     serializers: SerializersModule,
+    val networkListener: NetworkListener,
     final override val configuration: Queue.Configuration,
     private val store: JsonStorage
-): Queue {
+) : Queue {
     private val module = SerializersModule {
         contextual(InstantIso8601Serializer)
         polymorphic(JobRule::class) {
@@ -37,7 +38,7 @@ abstract class AbstractJobQueue(
     }
     private val format = Json { serializersModule = module + serializers }
 
-    val listener = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
+    val jobEventListener = MutableSharedFlow<JobEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
     /**
      * Scheduled jobs
@@ -65,6 +66,7 @@ abstract class AbstractJobQueue(
     init {
         if (configuration.startsAutomatically) {
             start()
+            networkListener.observeNetworkState()
         }
     }
 
@@ -72,19 +74,28 @@ abstract class AbstractJobQueue(
         schedule(task(), configure)
     }
 
-    suspend fun <Data> schedule(data: Data, task: (Data) -> DataTask<Data>, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
+    suspend fun <Data> schedule(
+        data: Data,
+        task: (Data) -> DataTask<Data>,
+        configure: JobInfo.() -> JobInfo = { JobInfo() }
+    ) {
         schedule(task(data), configure)
     }
 
     suspend fun schedule(task: Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
         val info = configure(JobInfo()).apply {
-            rules.forEach { it.mutating(this) }
+            rules.forEach { rule ->
+                rule.mutating(this)
+            }
         }
 
-        val job = Job(task, info)
+        val job = Job(
+            task = task,
+            info = info
+        )
 
         schedule(job).apply {
-            listener.emit(JobEvent.DidSchedule(job))
+            jobEventListener.emit(JobEvent.DidSchedule(job))
         }
     }
 
@@ -99,7 +110,7 @@ abstract class AbstractJobQueue(
 
         queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
     } catch (e: Throwable) {
-        listener.emit(JobEvent.DidThrowOnSchedule(e))
+        jobEventListener.emit(JobEvent.DidThrowOnSchedule(e))
     }
 
     private val delegate = JobDelegate()
@@ -118,10 +129,10 @@ abstract class AbstractJobQueue(
                         }
                         is JobEvent.ShouldRepeat -> {
                             schedule(event.job).apply {
-                                listener.emit(JobEvent.DidScheduleRepeat(event.job))
+                                jobEventListener.emit(JobEvent.DidScheduleRepeat(event.job))
                             }
                         }
-                        else -> listener.emit(event)
+                        else -> jobEventListener.emit(event)
                     }
                 }
             }
@@ -135,11 +146,11 @@ abstract class AbstractJobQueue(
                 job.delegate = delegate
                 running.value[job.id] = configuration.scope.launch {
                     try {
-                        listener.emit(JobEvent.WillRun(job))
-                        val result = job.run()
-                        listener.emit(result)
+                        jobEventListener.emit(JobEvent.WillRun(job))
+                        val result = job.run(currentNetworkState = networkListener.networkState)
+                        jobEventListener.emit(result)
                     } catch (e: CancellationException) {
-                        listener.emit(JobEvent.DidCancel(job))
+                        jobEventListener.emit(JobEvent.DidCancel(job))
                     } finally {
                         if (job.info.shouldPersist) {
                             store.remove(job.id.toString())
@@ -173,7 +184,9 @@ abstract class AbstractJobQueue(
             queue.value.clear()
             running.value.clear()
             configuration.scope.coroutineContext.cancelChildren()
-            if (clearStore) { store.clear() }
+            if (clearStore) {
+                store.clear()
+            }
         }
     }
 
@@ -185,7 +198,7 @@ abstract class AbstractJobQueue(
         isCancelling.withLock {
             queue.value.firstOrNull { it.id == id }?.let { job ->
                 queue.value.remove(job)
-                listener.emit(JobEvent.DidCancel(job))
+                jobEventListener.emit(JobEvent.DidCancel(job))
             } ?: running.value[id]?.cancel()
         }
     }

@@ -7,9 +7,11 @@ import platform.Foundation.NSUserDefaults
 actual class JobQueue(
     serializers: SerializersModule = SerializersModule {},
     configuration: Queue.Configuration = Queue.DefaultConfiguration,
+    networkListener: NetworkListener,
     store: JsonStorage = SettingsStorage(NSUserDefaultsSettings(NSUserDefaults("com.liftric.persisted.queue")))
 ) : AbstractJobQueue(
-    serializers,
-    configuration,
-    store
+    serializers = serializers,
+    networkListener = networkListener,
+    configuration = configuration,
+    store = store
 )
