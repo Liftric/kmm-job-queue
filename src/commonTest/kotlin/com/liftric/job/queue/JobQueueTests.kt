@@ -5,7 +5,7 @@ import kotlinx.coroutines.*
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
-expect class JobQueueTests: AbstractJobQueueTests
+expect class JobQueueTests : AbstractJobQueueTests
 abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     @AfterTest
     fun tearDown() = runBlocking {
@@ -18,7 +18,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         runBlocking {
             val id = UUIDFactory.create().toString()
             val job = async {
-                queue.listener.collect {
+                queue.jobEventListener.collect {
                     println(it)
                 }
             }
@@ -49,7 +49,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     fun testRetry() = runBlocking {
         var count = 0
         val job = launch {
-            queue.listener.collect {
+            queue.jobEventListener.collect {
                 println(it)
                 if (it is JobEvent.DidScheduleRepeat) {
                     count += 1
@@ -73,7 +73,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     fun testCancelDuringRun() {
         runBlocking {
             val listener = launch {
-                queue.listener.collect {
+                queue.jobEventListener.collect {
                     println(it)
                     if (it is JobEvent.DidSucceed || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.WillRun) {
@@ -103,7 +103,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
             val completable = CompletableDeferred<UUID>()
 
             launch {
-                queue.listener.collect {
+                queue.jobEventListener.collect {
                     println(it)
                     if (it is JobEvent.DidSucceed || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.DidSchedule) {
@@ -130,7 +130,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     fun testCancelByIdAfterEnqueue() {
         runBlocking {
             launch {
-                queue.listener.collect {
+                queue.jobEventListener.collect {
                     println(it)
                     if (it is JobEvent.DidSchedule) {
                         delay(3000L)
@@ -167,5 +167,49 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         queue.restore()
 
         assertEquals(1, queue.numberOfJobs)
+    }
+
+    @Test
+    fun testNetworkRuleSatisfied() = runBlocking {
+        val id = UUIDFactory.create().toString()
+        val job = async {
+            queue.jobEventListener.collect {
+                println("TEST -> JOB INFO: $it")
+                assertTrue(it is JobEvent.DidSucceed)
+            }
+        }
+
+        queue.schedule(TestData(id), ::TestTask) {
+            minRequiredNetwork(NetworkState.MOBILE)
+        }
+
+        queue.networkListener.networkState = NetworkState.WIFI
+        println("Network State: ${queue.networkListener.networkState}")
+
+        queue.start()
+        delay(200)
+        job.cancel()
+    }
+
+    @Test
+    fun testNetworkRuleUnSatisfied() = runBlocking {
+        val id = UUIDFactory.create().toString()
+        val job = launch {
+            queue.jobEventListener.collect {
+                println("TEST -> JOB INFO: $it")
+                assertTrue(it is JobEvent.DidFail)
+            }
+        }
+
+        queue.schedule(TestData(id), ::TestTask) {
+            minRequiredNetwork(NetworkState.WIFI)
+        }
+
+        queue.networkListener.networkState = NetworkState.NONE
+        println("Network State: ${queue.networkListener.networkState}")
+
+        queue.start()
+        delay(200)
+        job.cancel()
     }
 }
