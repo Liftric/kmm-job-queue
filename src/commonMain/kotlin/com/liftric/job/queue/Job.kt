@@ -1,10 +1,8 @@
 package com.liftric.job.queue
 
-import com.liftric.job.queue.rules.NetworkException
 import com.liftric.job.queue.rules.NetworkState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
@@ -35,34 +33,30 @@ data class Job(
     private var canRepeat: Boolean = true
 
     suspend fun run(currentNetworkState: NetworkState): JobEvent {
-        return withTimeout(info.timeout) {
-            val event = try {
-                info.rules.forEach { it.willRun(this@Job) }
-                if (info.minRequiredNetworkState <= currentNetworkState) {
-                    println("NETWORK: satisfied")
-                    task.body()
-                    JobEvent.DidSucceed(this@Job)
-                } else {
-                    println("NETWORK: unsatisfied")
-                    throw NetworkException("Network requirement not satisfied!")
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                canRepeat = task.onRepeat(e)
-                JobEvent.DidFail(this@Job, e)
+        val event = try {
+            info.rules.forEach {
+                it.willRun(
+                    context = this@Job,
+                    currentNetworkState = currentNetworkState
+                )
             }
-
-            try {
-                info.rules.forEach { it.willRemove(this@Job, event) }
-
-                event
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                JobEvent.DidFailOnRemove(this@Job, e)
-            }
+            task.body()
+            JobEvent.DidSucceed(this@Job)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            canRepeat = task.onRepeat(e)
+            JobEvent.DidFail(this@Job, e)
         }
+
+        try {
+            info.rules.forEach { it.willRemove(this@Job, event) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            JobEvent.DidFailOnRemove(this@Job, e)
+        }
+        return event
     }
 
     override suspend fun cancel() {
