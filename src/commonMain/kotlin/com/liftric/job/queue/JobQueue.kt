@@ -147,9 +147,14 @@ abstract class AbstractJobQueue(
                 running.value[job.id] = configuration.scope.launch {
                     try {
                         jobEventListener.emit(JobEvent.WillRun(job))
-                        val result = job.run(currentNetworkState = networkListener.networkState)
-                        jobEventListener.emit(result)
+                        withTimeout(job.info.timeout) {
+                            val result = job.run(currentNetworkState = networkListener.networkState)
+                            jobEventListener.emit(result)
+                        }
                     } catch (e: CancellationException) {
+                        if(e is TimeoutCancellationException) {
+                            println("Timeout exceeded")
+                        }
                         jobEventListener.emit(JobEvent.DidCancel(job))
                     } finally {
                         if (job.info.shouldPersist) {
