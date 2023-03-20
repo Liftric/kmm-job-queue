@@ -192,7 +192,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     }
 
     @Test
-    fun testNetworkRuleUnSatisfied() = runBlocking {
+    fun testNetworkRuleUnsatisfied() = runBlocking {
         val id = UUIDFactory.create().toString()
         val job = launch {
             queue.jobEventListener.collect {
@@ -205,7 +205,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
             minRequiredNetwork(NetworkState.WIFI)
         }
 
-        queue.networkListener.networkState = NetworkState.NONE
+        queue.networkListener.networkState = NetworkState.MOBILE
         println("Network State: ${queue.networkListener.networkState}")
 
         queue.start()
