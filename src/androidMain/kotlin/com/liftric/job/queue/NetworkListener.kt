@@ -1,11 +1,9 @@
 package com.liftric.job.queue
 
 import android.content.Context
-import com.liftric.job.queue.rules.NetworkState
-import dev.tmapps.konnection.Konnection
-import dev.tmapps.konnection.NetworkConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 actual class NetworkListener(
@@ -15,15 +13,19 @@ actual class NetworkListener(
 ) {
     actual fun observeNetworkState() {
         scope.launch {
-            Konnection(context = context)
+            NetworkManager(context)
                 .observeNetworkConnection()
-                .collect { networkConnection ->
-                    networkState = when (networkConnection) {
-                        NetworkConnection.WIFI -> NetworkState.WIFI
-                        NetworkConnection.MOBILE -> NetworkState.MOBILE
+                .collectLatest { currentNetworkState ->
+                    networkState = when (currentNetworkState) {
+                        NetworkState.NONE -> NetworkState.NONE
+                        NetworkState.MOBILE -> NetworkState.MOBILE
+                        NetworkState.WIFI -> NetworkState.WIFI
                         null -> NetworkState.NONE
                     }
                 }
         }
     }
+
+    // not needed for Android
+    actual fun stopMonitoring() {}
 }

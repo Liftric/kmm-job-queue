@@ -155,6 +155,7 @@ abstract class AbstractJobQueue(
                         if(e is TimeoutCancellationException) {
                             println("Timeout exceeded")
                         }
+                        networkListener.stopMonitoring()
                         jobEventListener.emit(JobEvent.DidCancel(job))
                     } finally {
                         if (job.info.shouldPersist) {

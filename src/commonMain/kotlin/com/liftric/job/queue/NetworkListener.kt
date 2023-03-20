@@ -1,10 +1,19 @@
 package com.liftric.job.queue
 
-import com.liftric.job.queue.rules.NetworkState
 import kotlinx.coroutines.CoroutineScope
 
+expect class NetworkManager
+
 expect class NetworkListener {
-    actual var networkState: NetworkState
+    var networkState: NetworkState
     val scope: CoroutineScope
     fun observeNetworkState()
+    fun stopMonitoring()
+}
+
+@kotlinx.serialization.Serializable
+enum class NetworkState {
+    NONE,
+    MOBILE,
+    WIFI
 }
