@@ -30,6 +30,7 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.atomicfu)
                 implementation(libs.multiplatform.settings)
+                implementation(libs.konnection)
             }
         }
         val commonTest by getting {
