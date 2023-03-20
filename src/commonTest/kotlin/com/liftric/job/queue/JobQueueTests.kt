@@ -172,9 +172,13 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     @Test
     fun testNetworkRuleSatisfied() = runBlocking {
         val id = UUIDFactory.create().toString()
-        val job = async {
+        launch {
             queue.jobEventListener.collect {
                 println("TEST -> JOB INFO: $it")
+                if (it is JobEvent.WillRun) {
+                    return@collect
+                }
+                cancel()
                 assertTrue(it is JobEvent.DidSucceed)
             }
         }
@@ -187,16 +191,18 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         println("Network State: ${queue.networkListener.networkState}")
 
         queue.start()
-        delay(200)
-        job.cancel()
     }
 
     @Test
     fun testNetworkRuleUnsatisfied() = runBlocking {
         val id = UUIDFactory.create().toString()
-        val job = launch {
+        launch {
             queue.jobEventListener.collect {
                 println("TEST -> JOB INFO: $it")
+                if (it is JobEvent.WillRun) {
+                    return@collect
+                }
+                cancel()
                 assertTrue(it is JobEvent.DidFail)
             }
         }
@@ -209,7 +215,5 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         println("Network State: ${queue.networkListener.networkState}")
 
         queue.start()
-        delay(200)
-        job.cancel()
     }
 }
