@@ -1,6 +1,5 @@
 package com.liftric.job.queue
 
-import com.liftric.job.queue.rules.NetworkState
 import kotlin.time.Duration
 import kotlinx.serialization.Serializable
 
