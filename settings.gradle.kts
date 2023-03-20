@@ -29,7 +29,6 @@ dependencyResolutionManagement {
             library("roboelectric", "org.robolectric", "robolectric").version("4.5.1")
             library("multiplatform-settings", "com.russhwolf", "multiplatform-settings").version("1.0.0-RC")
             library("multiplatform-settings-test", "com.russhwolf", "multiplatform-settings-test").version("1.0.0-RC")
-            library("konnection", "dev.tmapps", "konnection").version("1.1.10")
             plugin("versioning", "net.nemerosa.versioning").version("3.0.0")
             plugin("kotlin.serialization", "org.jetbrains.kotlin.plugin.serialization").versionRef("kotlin")
         }
