@@ -9,7 +9,7 @@ import platform.darwin.dispatch_queue_attr_make_with_qos_class
 import platform.darwin.dispatch_queue_create
 import platform.posix.QOS_CLASS_UTILITY
 
-class NetworkManager {
+actual class NetworkManager {
     private val networkChannel = Channel<NetworkState>(Channel.UNLIMITED)
     val network: Flow<NetworkState> = networkChannel.receiveAsFlow()
 
