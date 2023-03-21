@@ -2,29 +2,39 @@ package com.liftric.job.queue
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 actual class NetworkListener(
-    actual var networkState: NetworkState = NetworkState.NONE,
-    actual val scope: CoroutineScope = CoroutineScope(context = Dispatchers.Default)
+    scope: CoroutineScope = CoroutineScope(context = Dispatchers.Default)
+) : AbstractNetworkListener(
+    scope = scope
 ) {
     private val networkManager = NetworkManager()
 
-    actual fun observeNetworkState() {
+    private val _currentNetworkState = MutableSharedFlow<NetworkState>(replay = 1)
+    override val currentNetworkState: SharedFlow<NetworkState>
+        get() = _currentNetworkState.asSharedFlow()
+
+    override fun observeNetworkState() {
         networkManager.startMonitoring()
         scope.launch {
             networkManager.network.collectLatest { currentNetworkState ->
-                networkState = when (currentNetworkState) {
-                    NetworkState.NONE -> NetworkState.NONE
-                    NetworkState.MOBILE -> NetworkState.MOBILE
-                    NetworkState.WIFI -> NetworkState.WIFI
-                }
+                _currentNetworkState.emit(
+                    when (currentNetworkState) {
+                        NetworkState.NONE -> NetworkState.NONE
+                        NetworkState.MOBILE -> NetworkState.MOBILE
+                        NetworkState.WIFI -> NetworkState.WIFI
+                    }
+                )
             }
         }
     }
 
-    actual fun stopMonitoring() {
+    override fun stopMonitoring() {
         networkManager.stopMonitoring()
     }
 }
