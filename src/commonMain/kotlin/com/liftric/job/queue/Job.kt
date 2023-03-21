@@ -31,13 +31,10 @@ data class Job(
 
     private var canRepeat: Boolean = true
 
-    suspend fun run(currentNetworkState: NetworkState): JobEvent {
+    suspend fun run(): JobEvent {
         val event = try {
             info.rules.forEach {
-                it.willRun(
-                    context = this@Job,
-                    currentNetworkState = currentNetworkState
-                )
+                it.willRun(context = this@Job)
             }
             task.body()
             JobEvent.DidSucceed(this@Job)

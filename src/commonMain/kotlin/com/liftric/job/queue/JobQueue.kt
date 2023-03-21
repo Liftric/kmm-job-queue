@@ -66,7 +66,6 @@ abstract class AbstractJobQueue(
     init {
         if (configuration.startsAutomatically) {
             start()
-            networkListener.observeNetworkState()
         }
     }
 
@@ -146,13 +145,21 @@ abstract class AbstractJobQueue(
                 job.delegate = delegate
                 running.value[job.id] = configuration.scope.launch {
                     try {
-                        jobEventListener.emit(JobEvent.WillRun(job))
-                        withTimeout(job.info.timeout) {
-                            val result = job.run(currentNetworkState = networkListener.networkState)
-                            jobEventListener.emit(result)
+                        networkListener.currentNetworkState.collect { currentNetworkState ->
+                            val isNetworkRuleSatisfied = networkListener.isNetworkRuleSatisfied(
+                                jobInfo = job.info,
+                                currentNetworkState = currentNetworkState
+                            )
+                            if (isNetworkRuleSatisfied) {
+                                jobEventListener.emit(JobEvent.WillRun(job))
+                                withTimeout(job.info.timeout) {
+                                    val result = job.run()
+                                    jobEventListener.emit(result)
+                                }
+                            }
                         }
                     } catch (e: CancellationException) {
-                        if(e is TimeoutCancellationException) {
+                        if (e is TimeoutCancellationException) {
                             println("Timeout exceeded")
                         }
                         networkListener.stopMonitoring()

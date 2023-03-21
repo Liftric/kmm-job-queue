@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class DelayRule(val duration: Duration = 0.seconds): JobRule() {
-    override suspend fun willRun(context: JobContext, currentNetworkState: NetworkState) {
+    override suspend fun willRun(context: JobContext) {
         delay(duration)
     }
 }
