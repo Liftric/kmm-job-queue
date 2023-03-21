@@ -1,5 +1,6 @@
 package com.liftric.job.queue
 
+import android.annotation.SuppressLint
 import android.annotation.TargetApi
 import android.content.Context
 import android.net.ConnectivityManager
@@ -8,6 +9,7 @@ import android.os.Build
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
+@SuppressLint("MissingPermission")
 actual class NetworkManager(context: Context) {
     private var connectivityManager: ConnectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
