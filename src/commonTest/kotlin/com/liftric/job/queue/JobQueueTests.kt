@@ -175,11 +175,10 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         launch {
             queue.jobEventListener.collect {
                 println("TEST -> JOB INFO: $it")
-                if (it is JobEvent.WillRun) {
-                    return@collect
-                }
-                cancel()
-                assertTrue(it is JobEvent.DidSucceed)
+                if (it is JobEvent.DidCancel || it is JobEvent.DidSucceed) {
+                    cancel()
+                    assertTrue(it is JobEvent.DidSucceed)
+                } else return@collect
             }
         }
 
@@ -187,8 +186,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
             minRequiredNetwork(NetworkState.MOBILE)
         }
 
-        queue.networkListener.networkState = NetworkState.WIFI
-        println("Network State: ${queue.networkListener.networkState}")
+        println("Network State: ${queue.networkListener.currentNetworkState.value}")
 
         queue.start()
     }
@@ -199,11 +197,10 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         launch {
             queue.jobEventListener.collect {
                 println("TEST -> JOB INFO: $it")
-                if (it is JobEvent.WillRun) {
-                    return@collect
-                }
-                cancel()
-                assertTrue(it is JobEvent.DidFail)
+                if (it is JobEvent.DidCancel || it is JobEvent.DidSucceed) {
+                    cancel()
+                    assertTrue(it is JobEvent.DidCancel)
+                } else return@collect
             }
         }
 
@@ -211,8 +208,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
             minRequiredNetwork(NetworkState.WIFI)
         }
 
-        queue.networkListener.networkState = NetworkState.MOBILE
-        println("Network State: ${queue.networkListener.networkState}")
+        println("Network State: ${queue.networkListener.currentNetworkState.value}")
 
         queue.start()
     }
