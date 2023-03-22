@@ -3,6 +3,7 @@ package com.liftric.job.queue.rules
 import com.liftric.job.queue.JobInfo
 import com.liftric.job.queue.JobRule
 import com.liftric.job.queue.NetworkState
+import kotlinx.coroutines.CancellationException
 
 data class NetworkRule(val minRequiredNetworkState: NetworkState) : JobRule() {
     override suspend fun mutating(info: JobInfo) {
@@ -16,5 +17,5 @@ fun JobInfo.minRequiredNetwork(networkState: NetworkState): JobInfo {
     return this
 }
 
-class NetworkException(message: String) : Exception(message)
+class NetworkRuleTimeoutException(message: String) : CancellationException(message)
 
