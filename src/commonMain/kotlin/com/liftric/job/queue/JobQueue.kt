@@ -145,24 +145,40 @@ abstract class AbstractJobQueue(
                 job.delegate = delegate
                 running.value[job.id] = configuration.scope.launch {
                     try {
-                        networkListener.currentNetworkState.collect { currentNetworkState ->
-                            val isNetworkRuleSatisfied = networkListener.isNetworkRuleSatisfied(
-                                jobInfo = job.info,
-                                currentNetworkState = currentNetworkState
-                            )
-                            if (isNetworkRuleSatisfied) {
+                        var shouldRunJob = false
+                        try {
+                            withTimeout(15.seconds) NetworkRuleTimeout@{
+                                networkListener.currentNetworkState.collect { currentNetworkState ->
+                                    val isNetworkRuleSatisfied =
+                                        networkListener.isNetworkRuleSatisfied(
+                                            jobInfo = job.info,
+                                            currentNetworkState = currentNetworkState
+                                        )
+                                    if (isNetworkRuleSatisfied) {
+                                        shouldRunJob = true
+                                        jobEventListener.emit(JobEvent.NetworkRuleSatisfied(job))
+                                        this@NetworkRuleTimeout.cancel("Network rule satisfied")
+                                    }
+                                }
+                            }
+                        } catch (e: CancellationException) {
+                            if (shouldRunJob) {
                                 jobEventListener.emit(JobEvent.WillRun(job))
                                 withTimeout(job.info.timeout) {
                                     val result = job.run()
                                     jobEventListener.emit(result)
                                 }
-                            }
+                            } else throw NetworkRuleTimeoutException("Timeout exceeded for the network.")
                         }
                     } catch (e: CancellationException) {
-                        if (e is TimeoutCancellationException) {
-                            println("Timeout exceeded")
+                        when (e) {
+                            is TimeoutCancellationException -> {
+                                jobEventListener.emit(JobEvent.JobTimeout(job))
+                            }
+                            is NetworkRuleTimeoutException -> {
+                                jobEventListener.emit(JobEvent.NetworkRuleTimeout(job))
+                            }
                         }
-                        networkListener.stopMonitoring()
                         jobEventListener.emit(JobEvent.DidCancel(job))
                     } finally {
                         if (job.info.shouldPersist) {
@@ -171,6 +187,7 @@ abstract class AbstractJobQueue(
                         running.value[job.id]?.cancel()
                         running.value.remove(job.id)
                         lock.release()
+                        networkListener.stopMonitoring()
                     }
                 }
             }
