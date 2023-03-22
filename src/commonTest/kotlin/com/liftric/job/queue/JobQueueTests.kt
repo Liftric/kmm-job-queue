@@ -183,7 +183,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         }
 
         queue.schedule(TestData(id), ::TestTask) {
-            minRequiredNetwork(NetworkState.MOBILE)
+            minRequiredNetwork(NetworkState.NONE, 3.seconds)
         }
 
         println("Network State: ${queue.networkListener.currentNetworkState.value}")
@@ -205,7 +205,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         }
 
         queue.schedule(TestData(id), ::TestTask) {
-            minRequiredNetwork(NetworkState.WIFI)
+            minRequiredNetwork(NetworkState.WIFI, 3.seconds)
         }
 
         println("Network State: ${queue.networkListener.currentNetworkState.value}")

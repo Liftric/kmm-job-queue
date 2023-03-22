@@ -147,7 +147,7 @@ abstract class AbstractJobQueue(
                     try {
                         var shouldRunJob = false
                         try {
-                            withTimeout(15.seconds) NetworkRuleTimeout@{
+                            withTimeout(job.info.networkRuleTimeout) NetworkRuleTimeout@{
                                 networkListener.currentNetworkState.collect { currentNetworkState ->
                                     val isNetworkRuleSatisfied =
                                         networkListener.isNetworkRuleSatisfied(
@@ -164,7 +164,7 @@ abstract class AbstractJobQueue(
                         } catch (e: CancellationException) {
                             if (shouldRunJob) {
                                 jobEventListener.emit(JobEvent.WillRun(job))
-                                withTimeout(job.info.timeout) {
+                                withTimeout(job.info.jobTimeout) {
                                     val result = job.run()
                                     jobEventListener.emit(result)
                                 }
