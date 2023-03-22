@@ -16,7 +16,9 @@ actual class JobQueueTests : AbstractJobQueueTests(
             }
         },
         store = MapStorage(),
-        networkListener = NetworkListener(context = InstrumentationRegistry.getInstrumentation().context)
+        networkListener = NetworkListener(
+            networkManager = NetworkManager(InstrumentationRegistry.getInstrumentation().context)
+        )
     )
 )
 

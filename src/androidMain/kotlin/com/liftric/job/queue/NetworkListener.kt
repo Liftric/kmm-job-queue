@@ -1,29 +1,28 @@
 package com.liftric.job.queue
 
-import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 actual class NetworkListener(
-    val context: Context,
+    networkManager: NetworkManager,
     scope: CoroutineScope = CoroutineScope(context = Dispatchers.Default)
 ) : AbstractNetworkListener(
+    networkManager = networkManager,
     scope = scope
 ) {
-    private val _currentNetworkState = MutableSharedFlow<NetworkState>(replay = 1)
-    override val currentNetworkState: SharedFlow<NetworkState>
-        get() = _currentNetworkState.asSharedFlow()
+    private val _currentNetworkState = MutableStateFlow(NetworkState.NONE)
+    override val currentNetworkState: StateFlow<NetworkState>
+        get() = _currentNetworkState.asStateFlow()
 
     override fun observeNetworkState() {
         scope.launch {
-            NetworkManager(context)
+            networkManager
                 .observeNetworkConnection()
-                .collectLatest { currentNetworkState ->
+                .collect { currentNetworkState ->
                     _currentNetworkState.emit(
                         when (currentNetworkState) {
                             NetworkState.NONE -> NetworkState.NONE

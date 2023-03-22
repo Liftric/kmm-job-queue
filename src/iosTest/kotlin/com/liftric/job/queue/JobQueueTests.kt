@@ -11,6 +11,6 @@ actual class JobQueueTests : AbstractJobQueueTests(
             }
         },
         store = MapStorage(),
-        networkListener = NetworkListener()
+        networkListener = NetworkListener(networkManager = NetworkManager())
     )
 )

@@ -1,15 +1,16 @@
 package com.liftric.job.queue
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 
 expect class NetworkManager
 
 expect class NetworkListener : AbstractNetworkListener
 abstract class AbstractNetworkListener(
+    val networkManager: NetworkManager,
     val scope: CoroutineScope
 ) {
-    abstract val currentNetworkState: SharedFlow<NetworkState>
+    abstract val currentNetworkState: StateFlow<NetworkState>
     abstract fun observeNetworkState()
     abstract fun stopMonitoring()
 
