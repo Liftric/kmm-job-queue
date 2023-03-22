@@ -174,7 +174,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         val id = UUIDFactory.create().toString()
         launch {
             queue.jobEventListener.collect {
-                println("TEST -> JOB INFO: $it")
+                println(it)
                 if (it is JobEvent.DidCancel || it is JobEvent.DidSucceed) {
                     cancel()
                     assertTrue(it is JobEvent.DidSucceed)
@@ -196,11 +196,9 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         val id = UUIDFactory.create().toString()
         launch {
             queue.jobEventListener.collect {
-                println("TEST -> JOB INFO: $it")
-                if (it is JobEvent.DidCancel || it is JobEvent.DidSucceed) {
-                    cancel()
-                    assertTrue(it is JobEvent.DidCancel)
-                } else return@collect
+                println(it)
+                assertTrue(it is JobEvent.NetworkRuleTimeout)
+                cancel()
             }
         }
 
@@ -209,6 +207,26 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         }
 
         println("Network State: ${queue.networkListener.currentNetworkState.value}")
+
+        queue.start()
+    }
+
+    @Test
+    fun testJobTimeout() = runBlocking {
+        launch {
+            queue.jobEventListener.collect {
+                println(it)
+                if (it is JobEvent.NetworkRuleSatisfied || it is JobEvent.WillRun) {
+                    return@collect
+                }
+                assertTrue(it is JobEvent.JobTimeout)
+                cancel()
+            }
+        }
+
+        queue.schedule(::LongRunningTask) {
+            timeout(5.seconds)
+        }
 
         queue.start()
     }
