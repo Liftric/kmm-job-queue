@@ -147,6 +147,7 @@ abstract class AbstractJobQueue(
                 job.delegate = delegate
                 running.value[job.id] = configuration.scope.launch {
                     try {
+                        networkListener.observeNetworkState()
                         var shouldRunJob = false
                         try {
                             withTimeout(job.info.networkRuleTimeout) NetworkRuleTimeout@{
