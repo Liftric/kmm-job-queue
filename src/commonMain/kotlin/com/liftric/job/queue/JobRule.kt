@@ -4,9 +4,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 abstract class JobRule {
-    open suspend fun mutating(info: JobInfo) {}
+    open suspend fun mutating(jobInfo: JobInfo) {}
     @Throws(Throwable::class)
-    open suspend fun willSchedule(queue: Queue, context: JobContext) {}
-    open suspend fun willRun(context: JobContext) {}
-    open suspend fun willRemove(context: JobContext, result: JobEvent) {}
+    open suspend fun willSchedule(queue: Queue, jobContext: JobContext) {}
+    open suspend fun willRun(jobContext: JobContext) {}
+    open suspend fun willRemove(jobContext: JobContext, result: JobEvent) {}
 }

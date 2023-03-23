@@ -23,10 +23,10 @@ data class Job(
     internal var delegate: JobDelegate? = null
 
     constructor(task: Task, info: JobInfo) : this(
-        UUIDFactory.create(),
-        info,
-        task,
-        Clock.System.now()
+        id = UUIDFactory.create(),
+        info = info,
+        task = task,
+        startTime = Clock.System.now()
     )
 
     private var canRepeat: Boolean = true
@@ -34,34 +34,45 @@ data class Job(
     suspend fun run(): JobEvent {
         val event = try {
             info.rules.forEach {
-                it.willRun(context = this@Job)
+                it.willRun(jobContext = this@Job)
             }
             task.body()
-            JobEvent.DidSucceed(this@Job)
+            JobEvent.DidSucceed(job = this@Job)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             canRepeat = task.onRepeat(e)
-            JobEvent.DidFail(this@Job, e)
+            JobEvent.DidFail(job = this@Job, error = e)
         }
 
         try {
-            info.rules.forEach { it.willRemove(this@Job, event) }
+            info.rules.forEach { rule ->
+                rule.willRemove(jobContext = this@Job, result = event)
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            JobEvent.DidFailOnRemove(this@Job, e)
+            JobEvent.DidFailOnRemove(job = this@Job, error = e)
         }
         return event
     }
 
     override suspend fun cancel() {
-        delegate?.onEvent?.emit(JobEvent.DidCancel(this@Job))
+        delegate?.onEvent?.emit(JobEvent.DidCancel(job = this@Job))
     }
 
     override suspend fun repeat(id: UUID, info: JobInfo, task: Task, startTime: Instant) {
         if (canRepeat) {
-            delegate?.onEvent?.emit(JobEvent.ShouldRepeat(Job(id, info, task, startTime)))
+            delegate?.onEvent?.emit(
+                JobEvent.ShouldRepeat(
+                    Job(
+                        id = id,
+                        info = info,
+                        task = task,
+                        startTime = startTime
+                    )
+                )
+            )
         }
     }
 }

@@ -54,7 +54,7 @@ abstract class AbstractJobQueue(
     /**
      * Semaphore to limit concurrency
      */
-    private val lock = Semaphore(configuration.maxConcurrency, 0)
+    private val lock = Semaphore(permits = configuration.maxConcurrency, acquiredPermits = 0)
 
     /**
      * Mutex to suspend queue operations during cancellation
@@ -70,7 +70,7 @@ abstract class AbstractJobQueue(
     }
 
     suspend fun schedule(task: () -> Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
-        schedule(task(), configure)
+        schedule(task = task(), configure = configure)
     }
 
     suspend fun <Data> schedule(
@@ -78,20 +78,17 @@ abstract class AbstractJobQueue(
         task: (Data) -> DataTask<Data>,
         configure: JobInfo.() -> JobInfo = { JobInfo() }
     ) {
-        schedule(task(data), configure)
+        schedule(task = task(data), configure = configure)
     }
 
     suspend fun schedule(task: Task, configure: JobInfo.() -> JobInfo = { JobInfo() }) {
         val info = configure(JobInfo()).apply {
             rules.forEach { rule ->
-                rule.mutating(this)
+                rule.mutating(jobInfo = this)
             }
         }
 
-        val job = Job(
-            task = task,
-            info = info
-        )
+        val job = Job(task = task, info = info)
 
         schedule(job).apply {
             jobEventListener.emit(JobEvent.DidSchedule(job))
@@ -100,14 +97,19 @@ abstract class AbstractJobQueue(
 
     private suspend fun schedule(job: Job) = try {
         job.info.rules.forEach {
-            it.willSchedule(this, job)
+            it.willSchedule(queue = this, jobContext = job)
         }
 
         if (job.info.shouldPersist) {
-            store.set(job.id.toString(), format.encodeToString(job))
+            store.set(id = job.id.toString(), json = format.encodeToString(job))
         }
 
-        queue.value = queue.value.plus(listOf(job)).sortedBy { it.startTime }.toMutableList()
+        queue.value = queue.value
+            .plus(listOf(job))
+            .sortedBy { queueJob ->
+                queueJob.startTime
+            }
+            .toMutableList()
     } catch (e: Throwable) {
         jobEventListener.emit(JobEvent.DidThrowOnSchedule(e))
     }

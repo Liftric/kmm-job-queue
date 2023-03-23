@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class TimeoutRule(val timeout: Duration): JobRule() {
-    override suspend fun mutating(info: JobInfo) {
-        info.jobTimeout = timeout
+    override suspend fun mutating(jobInfo: JobInfo) {
+        jobInfo.jobTimeout = timeout
     }
 }
 

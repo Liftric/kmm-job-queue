@@ -11,9 +11,9 @@ data class NetworkRule(
     val minRequiredNetworkState: NetworkState,
     val networkRuleTimeout: Duration
 ) : JobRule() {
-    override suspend fun mutating(info: JobInfo) {
-        info.minRequiredNetworkState = minRequiredNetworkState
-        info.networkRuleTimeout = networkRuleTimeout
+    override suspend fun mutating(jobInfo: JobInfo) {
+        jobInfo.minRequiredNetworkState = minRequiredNetworkState
+        jobInfo.networkRuleTimeout = networkRuleTimeout
     }
 }
 
