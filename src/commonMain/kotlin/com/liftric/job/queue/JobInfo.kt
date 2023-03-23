@@ -6,7 +6,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class JobInfo(
     var tag: String? = null,
-    var timeout: Duration = Duration.INFINITE,
+    var jobTimeout: Duration = Duration.INFINITE,
+    var networkRuleTimeout: Duration = Duration.INFINITE,
     var rules: MutableList<JobRule> = mutableListOf(),
-    var shouldPersist: Boolean = false
+    var shouldPersist: Boolean = false,
+    var minRequiredNetworkState: NetworkState = NetworkState.NONE
 )

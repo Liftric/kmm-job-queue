@@ -10,4 +10,7 @@ sealed class JobEvent {
     data class ShouldRepeat(val job: Job): JobEvent()
     data class DidCancel(val job: JobContext): JobEvent()
     data class DidFailOnRemove(val job: JobContext, val error: Throwable): JobEvent()
+    data class NetworkRuleSatisfied(val job: JobContext): JobEvent()
+    data class NetworkRuleTimeout(val job: JobContext): JobEvent()
+    data class JobTimeout(val job: JobContext): JobEvent()
 }

@@ -6,8 +6,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class PersistenceRule(val shouldPersist: Boolean): JobRule() {
-    override suspend fun mutating(info: JobInfo) {
-        info.shouldPersist = shouldPersist
+    override suspend fun mutating(jobInfo: JobInfo) {
+        jobInfo.shouldPersist = shouldPersist
     }
 }
 

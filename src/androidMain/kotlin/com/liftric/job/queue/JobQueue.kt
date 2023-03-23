@@ -8,9 +8,13 @@ actual class JobQueue(
     context: Context,
     serializers: SerializersModule = SerializersModule {},
     configuration: Queue.Configuration = Queue.DefaultConfiguration,
-    store: JsonStorage = SettingsStorage(SharedPreferencesSettings.Factory(context).create("com.liftric.persisted.queue"))
+    networkListener: NetworkListener,
+    store: JsonStorage = SettingsStorage(
+        SharedPreferencesSettings.Factory(context).create("com.liftric.persisted.queue")
+    )
 ) : AbstractJobQueue(
-    serializers,
-    configuration,
-    store
+    serializers = serializers,
+    networkListener = networkListener,
+    configuration = configuration,
+    store = store
 )

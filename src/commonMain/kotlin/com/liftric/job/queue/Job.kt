@@ -2,7 +2,6 @@ package com.liftric.job.queue
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
@@ -19,47 +18,61 @@ data class Job(
     override val info: JobInfo,
     override val task: Task,
     override val startTime: Instant
-): JobContext {
-    @Transient internal var delegate: JobDelegate? = null
+) : JobContext {
+    @Transient
+    internal var delegate: JobDelegate? = null
 
-    constructor(task: Task, info: JobInfo) : this (UUIDFactory.create(), info, task, Clock.System.now())
+    constructor(task: Task, info: JobInfo) : this(
+        id = UUIDFactory.create(),
+        info = info,
+        task = task,
+        startTime = Clock.System.now()
+    )
 
     private var canRepeat: Boolean = true
 
     suspend fun run(): JobEvent {
-        return withTimeout(info.timeout) {
-            val event = try {
-                info.rules.forEach { it.willRun(this@Job) }
-
-                task.body()
-
-                JobEvent.DidSucceed(this@Job)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                canRepeat = task.onRepeat(e)
-                JobEvent.DidFail(this@Job, e)
+        val event = try {
+            info.rules.forEach {
+                it.willRun(jobContext = this@Job)
             }
-
-            try {
-                info.rules.forEach { it.willRemove(this@Job, event) }
-
-                event
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                JobEvent.DidFailOnRemove(this@Job, e)
-            }
+            task.body()
+            JobEvent.DidSucceed(job = this@Job)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            canRepeat = task.onRepeat(e)
+            JobEvent.DidFail(job = this@Job, error = e)
         }
+
+        try {
+            info.rules.forEach { rule ->
+                rule.willRemove(jobContext = this@Job, result = event)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            JobEvent.DidFailOnRemove(job = this@Job, error = e)
+        }
+        return event
     }
 
     override suspend fun cancel() {
-        delegate?.onEvent?.emit(JobEvent.DidCancel(this@Job))
+        delegate?.onEvent?.emit(JobEvent.DidCancel(job = this@Job))
     }
 
     override suspend fun repeat(id: UUID, info: JobInfo, task: Task, startTime: Instant) {
         if (canRepeat) {
-            delegate?.onEvent?.emit(JobEvent.ShouldRepeat(Job(id, info, task, startTime)))
+            delegate?.onEvent?.emit(
+                JobEvent.ShouldRepeat(
+                    Job(
+                        id = id,
+                        info = info,
+                        task = task,
+                        startTime = startTime
+                    )
+                )
+            )
         }
     }
 }

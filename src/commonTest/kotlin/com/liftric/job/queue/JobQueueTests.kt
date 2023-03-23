@@ -5,7 +5,7 @@ import kotlinx.coroutines.*
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
-expect class JobQueueTests: AbstractJobQueueTests
+expect class JobQueueTests : AbstractJobQueueTests
 abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     @AfterTest
     fun tearDown() = runBlocking {
@@ -18,7 +18,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         runBlocking {
             val id = UUIDFactory.create().toString()
             val job = async {
-                queue.listener.collect {
+                queue.jobEventListener.collect {
                     println(it)
                 }
             }
@@ -49,7 +49,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     fun testRetry() = runBlocking {
         var count = 0
         val job = launch {
-            queue.listener.collect {
+            queue.jobEventListener.collect {
                 println(it)
                 if (it is JobEvent.DidScheduleRepeat) {
                     count += 1
@@ -73,7 +73,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     fun testCancelDuringRun() {
         runBlocking {
             val listener = launch {
-                queue.listener.collect {
+                queue.jobEventListener.collect {
                     println(it)
                     if (it is JobEvent.DidSucceed || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.WillRun) {
@@ -103,7 +103,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
             val completable = CompletableDeferred<UUID>()
 
             launch {
-                queue.listener.collect {
+                queue.jobEventListener.collect {
                     println(it)
                     if (it is JobEvent.DidSucceed || it is JobEvent.DidFail) fail("Continued after run")
                     if (it is JobEvent.DidSchedule) {
@@ -130,7 +130,7 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
     fun testCancelByIdAfterEnqueue() {
         runBlocking {
             launch {
-                queue.listener.collect {
+                queue.jobEventListener.collect {
                     println(it)
                     if (it is JobEvent.DidSchedule) {
                         delay(3000L)
@@ -167,5 +167,67 @@ abstract class AbstractJobQueueTests(private val queue: JobQueue) {
         queue.restore()
 
         assertEquals(1, queue.numberOfJobs)
+    }
+
+    @Test
+    fun testNetworkRuleSatisfied() = runBlocking {
+        val id = UUIDFactory.create().toString()
+        launch {
+            queue.jobEventListener.collect {
+                println(it)
+                if (it is JobEvent.DidCancel || it is JobEvent.DidSucceed) {
+                    cancel()
+                    assertTrue(it is JobEvent.DidSucceed)
+                } else return@collect
+            }
+        }
+
+        queue.schedule(TestData(id), ::TestTask) {
+            minRequiredNetwork(NetworkState.NONE, 3.seconds)
+        }
+
+        println("Network State: ${queue.networkListener.currentNetworkState.value}")
+
+        queue.start()
+    }
+
+    @Test
+    fun testNetworkRuleUnsatisfied() = runBlocking {
+        val id = UUIDFactory.create().toString()
+        launch {
+            queue.jobEventListener.collect {
+                println(it)
+                assertTrue(it is JobEvent.NetworkRuleTimeout)
+                cancel()
+            }
+        }
+
+        queue.schedule(TestData(id), ::TestTask) {
+            minRequiredNetwork(NetworkState.WIFI, 3.seconds)
+        }
+
+        println("Network State: ${queue.networkListener.currentNetworkState.value}")
+
+        queue.start()
+    }
+
+    @Test
+    fun testJobTimeout() = runBlocking {
+        launch {
+            queue.jobEventListener.collect {
+                println(it)
+                if (it is JobEvent.NetworkRuleSatisfied || it is JobEvent.WillRun) {
+                    return@collect
+                }
+                assertTrue(it is JobEvent.JobTimeout)
+                cancel()
+            }
+        }
+
+        queue.schedule(::LongRunningTask) {
+            timeout(5.seconds)
+        }
+
+        queue.start()
     }
 }
