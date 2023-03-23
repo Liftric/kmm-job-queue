@@ -15,8 +15,7 @@ actual class NetworkManager(context: Context) {
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private val connectionPublisher = MutableStateFlow(getCurrentNetworkConnection())
-
-    fun observeNetworkConnection(): Flow<NetworkState?> = connectionPublisher
+    val network: Flow<NetworkState?> = connectionPublisher
 
     private fun getCurrentNetworkConnection(): NetworkState? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

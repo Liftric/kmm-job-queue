@@ -19,22 +19,19 @@ actual class NetworkListener(
     override val currentNetworkState: StateFlow<NetworkState>
         get() = _currentNetworkState.asStateFlow()
 
+    private var job: kotlinx.coroutines.Job? = null
+
     override fun observeNetworkState() {
-        networkManager.startMonitoring()
-        scope.launch {
+        job = scope.launch {
+            networkManager.startMonitoring()
             networkManager.network.collectLatest { currentNetworkState ->
-                _currentNetworkState.emit(
-                    when (currentNetworkState) {
-                        NetworkState.NONE -> NetworkState.NONE
-                        NetworkState.MOBILE -> NetworkState.MOBILE
-                        NetworkState.WIFI -> NetworkState.WIFI
-                    }
-                )
+                _currentNetworkState.emit(currentNetworkState)
             }
         }
     }
 
     override fun stopMonitoring() {
         networkManager.stopMonitoring()
+        job?.cancel()
     }
 }

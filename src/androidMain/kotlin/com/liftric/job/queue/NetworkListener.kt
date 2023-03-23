@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 actual class NetworkListener(
@@ -18,24 +19,19 @@ actual class NetworkListener(
     override val currentNetworkState: StateFlow<NetworkState>
         get() = _currentNetworkState.asStateFlow()
 
+    private var job: kotlinx.coroutines.Job? = null
+
     override fun observeNetworkState() {
-        scope.launch {
+        job = scope.launch {
             networkManager
-                .observeNetworkConnection()
-                .collect { currentNetworkState ->
-                    _currentNetworkState.emit(
-                        when (currentNetworkState) {
-                            NetworkState.NONE -> NetworkState.NONE
-                            NetworkState.MOBILE -> NetworkState.MOBILE
-                            NetworkState.WIFI -> NetworkState.WIFI
-                            null -> NetworkState.NONE
-                        }
-                    )
+                .network
+                .collectLatest { currentNetworkState ->
+                    _currentNetworkState.emit(currentNetworkState ?: NetworkState.NONE)
                 }
         }
     }
 
-
-    // not needed for Android
-    override fun stopMonitoring() {}
+    override fun stopMonitoring() {
+        job?.cancel()
+    }
 }
